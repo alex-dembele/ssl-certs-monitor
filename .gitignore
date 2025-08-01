@@ -1,3 +1,4 @@
 # Fichier: .gitignore
 __pycache__/
 *.pyc
+ssl_status.json
