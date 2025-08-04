@@ -2,8 +2,7 @@
 "use client";
 
 import React, { useState, MouseEvent } from "react";
-// MODIFIÉ : Importer le type "Variants" en plus de "motion"
-import { motion, Variants } from "framer-motion"; 
+import { motion, Variants } from "framer-motion";
 import type { Certificate } from '../app/page';
 
 // Le composant StatusBadge ne change pas...
@@ -21,7 +20,6 @@ const StatusBadge = ({ status }: { status: Certificate['status'] }) => {
   );
 };
 
-// MODIFIÉ : On ajoute le type "Variants" à notre constante
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
@@ -32,7 +30,6 @@ const containerVariants: Variants = {
   },
 };
 
-// MODIFIÉ : On ajoute le type "Variants" à notre constante
 const itemVariants: Variants = {
   hidden: { y: 20, opacity: 0 },
   visible: {
@@ -47,7 +44,12 @@ const itemVariants: Variants = {
 
 export default function DashboardDisplay({ certificates }: { certificates: Certificate[] }) {
   const [spotlightStyle, setSpotlightStyle] = useState({});
-  const [searchQuery, setSearchQuery] = useState("");
+  
+  // ✅ CORRECTION : Deux états pour gérer la recherche
+  // "inputValue" pour ce qui est tapé dans la barre
+  const [inputValue, setInputValue] = useState("");
+  // "searchTerm" pour le filtre réellement appliqué après avoir cliqué sur le bouton
+  const [searchTerm, setSearchTerm] = useState("");
 
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
     const { clientX, clientY } = e;
@@ -56,8 +58,14 @@ export default function DashboardDisplay({ certificates }: { certificates: Certi
     });
   };
 
+  // ✅ NOUVEAU : Fonction pour lancer la recherche
+  const handleSearch = () => {
+    setSearchTerm(inputValue);
+  };
+
+  // La logique de filtrage utilise maintenant "searchTerm"
   const filteredCertificates = certificates.filter(cert =>
-    cert.domain.toLowerCase().includes(searchQuery.toLowerCase())
+    cert.domain.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -78,13 +86,15 @@ export default function DashboardDisplay({ certificates }: { certificates: Certi
           <p className="text-slate-400 mt-2">Vue d&apos;ensemble de la validité de vos certificats</p>
         </header>
 
-        <div className="mb-8 flex justify-center">
+        {/* ✅ MODIFIÉ : Le formulaire de recherche avec le bouton */}
+        <div className="mb-8 flex justify-center items-center gap-2">
           <div className="relative w-full max-w-lg">
             <input
               type="text"
               placeholder="Rechercher un domaine..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
               className="w-full pl-10 pr-4 py-3 bg-slate-900/50 backdrop-blur-md border border-slate-700 rounded-lg
                          text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
@@ -94,10 +104,19 @@ export default function DashboardDisplay({ certificates }: { certificates: Certi
               </svg>
             </div>
           </div>
+          <button
+            onClick={handleSearch}
+            className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg
+                       transition-colors duration-300"
+          >
+            Rechercher
+          </button>
         </div>
 
         {filteredCertificates.length > 0 ? (
+          // ✅ CORRECTION : Ajout d'une "key" au conteneur pour forcer l'animation à se redéclencher
           <motion.div
+            key={searchTerm} // Cette clé force le re-rendu et donc la ré-animation à chaque recherche
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
             variants={containerVariants}
             initial="hidden"
