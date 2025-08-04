@@ -1,0 +1,34 @@
+# Fichier: docker-compose.yml
+version: '3.8'
+
+services:
+  # Service du Frontend (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      # Monte le volume partagé en lecture seule
+      - status_data:/app/data
+    depends_on:
+      - backend-cron # S'assure que le backend tourne avant
+
+  # Service du Backend (Python) qui s'exécute en boucle
+  backend-cron:
+    build:
+      context: ./backend
+    volumes:
+      # Monte le volume partagé pour y écrire le fichier
+      - status_data:/app/data
+    # Commande pour exécuter le script toutes les 24 heures (86400 secondes)
+    command: >
+      sh -c "while true; do 
+               python monitor.py; 
+               echo 'Script executed. Waiting 24 hours...'; 
+               sleep 86400; 
+             done"
+
+# Définition du volume partagé
+volumes:
+  status_data:
