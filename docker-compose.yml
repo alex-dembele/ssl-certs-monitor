@@ -7,7 +7,7 @@ services:
     build:
       context: ./frontend
     ports:
-      - "3000:3000"
+      - "3005:3000"
     volumes:
       # Monte le volume partagé en lecture seule
       - status_data:/app/data
@@ -21,6 +21,7 @@ services:
     volumes:
       # Monte le volume partagé pour y écrire le fichier
       - status_data:/app/data
+      - ./backend/domains.txt:/app/domains.txt:ro
     # Commande pour exécuter le script toutes les 24 heures (86400 secondes)
     command: >
       sh -c "while true; do 

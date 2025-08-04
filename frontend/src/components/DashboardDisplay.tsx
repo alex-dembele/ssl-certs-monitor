@@ -1,10 +1,12 @@
 // Fichier: frontend/src/components/DashboardDisplay.tsx
-"use client"; // Indique que c'est un Composant Client
+"use client";
 
 import React, { useState, MouseEvent } from "react";
-import type { Certificate } from '../app/page'; // Importer le type depuis la page principale
+// MODIFIÉ : Importer le type "Variants" en plus de "motion"
+import { motion, Variants } from "framer-motion"; 
+import type { Certificate } from '../app/page';
 
-// Composant pour le badge de statut
+// Le composant StatusBadge ne change pas...
 const StatusBadge = ({ status }: { status: Certificate['status'] }) => {
   const colorClasses = {
     'OK': 'bg-green-500/20 text-green-400 border-green-500/30',
@@ -19,9 +21,33 @@ const StatusBadge = ({ status }: { status: Certificate['status'] }) => {
   );
 };
 
-// Le composant d'affichage principal qui reçoit les données via les props
+// MODIFIÉ : On ajoute le type "Variants" à notre constante
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+    },
+  },
+};
+
+// MODIFIÉ : On ajoute le type "Variants" à notre constante
+const itemVariants: Variants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      type: "spring",
+      stiffness: 100,
+    },
+  },
+};
+
 export default function DashboardDisplay({ certificates }: { certificates: Certificate[] }) {
   const [spotlightStyle, setSpotlightStyle] = useState({});
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
     const { clientX, clientY } = e;
@@ -29,6 +55,10 @@ export default function DashboardDisplay({ certificates }: { certificates: Certi
       background: `radial-gradient(600px at ${clientX}px ${clientY}px, rgba(29, 78, 216, 0.15), transparent 80%)`
     });
   };
+
+  const filteredCertificates = certificates.filter(cert =>
+    cert.domain.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div 
@@ -41,18 +71,42 @@ export default function DashboardDisplay({ certificates }: { certificates: Certi
       />
       
       <div className="max-w-7xl mx-auto">
-        <header className="text-center mb-12">
+        <header className="text-center mb-8">
           <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">
             SSL Certificate Dashboard
           </h1>
-          <p className="text-slate-400 mt-2">Vue d'ensemble de la validité de vos certificats</p>
+          <p className="text-slate-400 mt-2">Vue d&apos;ensemble de la validité de vos certificats</p>
         </header>
 
-        {certificates.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {certificates.map((cert) => (
-              <div 
+        <div className="mb-8 flex justify-center">
+          <div className="relative w-full max-w-lg">
+            <input
+              type="text"
+              placeholder="Rechercher un domaine..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 bg-slate-900/50 backdrop-blur-md border border-slate-700 rounded-lg
+                         text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            />
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {filteredCertificates.length > 0 ? (
+          <motion.div
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {filteredCertificates.map((cert) => (
+              <motion.div 
                 key={cert.domain} 
+                variants={itemVariants}
                 className="bg-slate-900/50 backdrop-blur-md border border-slate-800 rounded-xl p-6
                            transform hover:-translate-y-1 transition-transform duration-300"
               >
@@ -66,7 +120,7 @@ export default function DashboardDisplay({ certificates }: { certificates: Certi
                     <p className="text-sm text-slate-400">Expire dans</p>
                     <p className="text-3xl font-semibold text-slate-50 mb-4">{cert.days_left ?? 'N/A'} jours</p>
                     <p className="text-xs text-slate-500">
-                      Date d'expiration : {cert.expiry_date ? new Date(cert.expiry_date).toLocaleDateString('fr-FR') : 'Inconnue'}
+                      Date d&apos;expiration : {cert.expiry_date ? new Date(cert.expiry_date).toLocaleDateString('fr-FR') : 'Inconnue'}
                     </p>
                   </div>
                 ) : (
@@ -74,13 +128,13 @@ export default function DashboardDisplay({ certificates }: { certificates: Certi
                      <p className="text-xs text-red-300">{cert.error_message}</p>
                   </div>
                 )}
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         ) : (
           <div className="text-center py-10">
-            <p className="text-slate-400">En attente des données de certificats...</p>
-            <p className="text-sm text-slate-500">Le script de vérification est peut-être en cours d'exécution.</p>
+            <p className="text-slate-400">Aucun certificat trouvé.</p>
+            <p className="text-sm text-slate-500">Essayez de modifier votre recherche ou vérifiez votre liste de domaines.</p>
           </div>
         )}
       </div>

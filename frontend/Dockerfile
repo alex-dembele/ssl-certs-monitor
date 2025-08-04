@@ -1,3 +1,5 @@
+# Fichier: frontend/Dockerfile
+
 # Étape 1: Build de l'application
 FROM node:18-alpine AS builder
 WORKDIR /app
@@ -14,6 +16,7 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
 EXPOSE 3000
-ENV PORT 3000
+# CORRECTION ICI
+ENV PORT=3000
 
 CMD ["node", "server.js"]

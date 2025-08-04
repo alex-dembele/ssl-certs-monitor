@@ -1,8 +1,9 @@
 // Fichier: frontend/src/app/page.tsx
-
 import fs from 'fs/promises'; // Utiliser la version asynchrone de fs
 import path from 'path';
 import DashboardDisplay from '../components/DashboardDisplay'; // Importer le nouveau composant client
+
+export const dynamic = 'force-dynamic';
 
 // Définir le type pour les données d'un certificat
 export interface Certificate {
