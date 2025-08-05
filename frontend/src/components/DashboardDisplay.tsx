@@ -82,10 +82,9 @@ export default function DashboardDisplay() {
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
     const fetchInitialData = useCallback(async () => {
-        // Ne met pas l'indicateur de chargement pour les rafraîchissements en arrière-plan
         try {
-            const res = await fetch(`/ssl_status.json?t=${new Date().getTime()}`); // Astuce pour éviter le cache navigateur
-            if (res.status === 404) { // Gère le cas où le fichier n'existe pas encore
+            const res = await fetch(`/ssl_status.json?t=${new Date().getTime()}`);
+            if (res.status === 404) {
                 setCertificates([]);
                 return;
             }
@@ -94,7 +93,7 @@ export default function DashboardDisplay() {
             setCertificates(data);
             setError(null);
         } catch (err) {
-            if (err instanceof Error) { setError(err.message); } 
+            if (err instanceof Error) { setError(err.message); }
             else { setError("Une erreur de type inconnu est survenue."); }
             setCertificates([]);
         } finally {
@@ -115,6 +114,7 @@ export default function DashboardDisplay() {
         newDomains.forEach(async (domain) => {
             try {
                 const res = await fetch(`${API_URL}/api/check/${domain}`);
+                if (!res.ok) throw new Error("La vérification a échoué");
                 const checkedCert: Certificate = await res.json();
                 setCertificates(prevCerts => prevCerts.map(cert => cert.domain === domain ? checkedCert : cert));
             } catch (e) {

@@ -1,30 +1,33 @@
 # Fichier: docker-compose.yml
-
 services:
   frontend:
     build: ./frontend
     ports:
       - "3005:3000"
+    volumes:
+      - status_data:/app/public # Le frontend lit le rapport ici
     depends_on:
       - backend-api
-    # On retire le volume 'status_data', il n'est plus nécessaire
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
+    dns: [ "8.8.8.8", "1.1.1.1" ]
 
   backend-api:
     build: ./backend
     ports:
       - "8000:8000"
-    env_file:
-      - .env
     volumes:
-      # L'API n'a besoin que du volume pour stocker sa liste de domaines
-      - api_data:/app
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
+      - api_data:/app # L'API gère la liste des domaines
+    dns: [ "8.8.8.8", "1.1.1.1" ]
+
+  backend-cron:
+    build: ./backend
+    env_file: [ ".env" ]
+    volumes:
+      - api_data:/app # Le cron lit la liste des domaines
+      - status_data:/app/data # Le cron écrit le rapport de statut
+    dns: [ "8.8.8.8", "1.1.1.1" ]
+    command: >
+      sh -c "while true; do python cron_job.py; sleep 86400; done"
 
 volumes:
   api_data:
-# Le volume 'status_data' est supprimé
+  status_data:
