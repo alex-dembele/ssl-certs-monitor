@@ -7,20 +7,22 @@ import toast from 'react-hot-toast';
 
 const API_URL = "http://localhost:8000";
 
+// L'interface des props attendues par la modale
 interface AddDomainModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onDomainAdded: () => void; // Pour rafraîchir la liste après l'ajout
+  onDomainsAdded: (newDomains: string[]) => void;
 }
 
-export default function AddDomainModal({ isOpen, onClose, onDomainAdded }: AddDomainModalProps) {
-  const [domainsText, setDomainsText] = useState(""); // État pour la zone de texte
+export default function AddDomainModal({ isOpen, onClose, onDomainsAdded }: AddDomainModalProps) {
+  // Un seul état pour contenir tout le texte collé par l'utilisateur
+  const [domainsText, setDomainsText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Sépare le texte en une liste de domaines, en retirant les lignes vides et les espaces superflus
+    // On transforme le texte en une liste propre : un domaine par ligne, sans espaces inutiles ni lignes vides
     const domains = domainsText.split('\n').map(d => d.trim()).filter(d => d);
 
     if (domains.length === 0) {
@@ -32,7 +34,7 @@ export default function AddDomainModal({ isOpen, onClose, onDomainAdded }: AddDo
     const toastId = toast.loading("Ajout des domaines en cours...");
 
     try {
-      // On utilise le nouvel endpoint "bulk" pour l'ajout en masse
+      // On appelle le nouvel endpoint de l'API dédié à l'ajout en masse
       const response = await fetch(`${API_URL}/api/domains/bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -41,13 +43,13 @@ export default function AddDomainModal({ isOpen, onClose, onDomainAdded }: AddDo
 
       const responseData = await response.json();
       if (!response.ok) {
-        throw new Error(responseData.detail || "Une erreur est survenue.");
+        throw new Error(responseData.detail || "Une erreur est survenue lors de l'ajout.");
       }
 
-      toast.success(responseData.message, { id: toastId, duration: 4000 });
-      setDomainsText("");
-      onDomainAdded();
-      onClose();
+      toast.success(responseData.message, { id: toastId });
+      setDomainsText(""); // On vide le champ
+      onDomainsAdded(domains); // On notifie le composant parent pour la mise à jour optimiste
+      onClose(); // On ferme la modale
 
     } catch (err) {
       toast.dismiss(toastId);
@@ -87,7 +89,7 @@ export default function AddDomainModal({ isOpen, onClose, onDomainAdded }: AddDo
               <textarea
                 value={domainsText}
                 onChange={(e) => setDomainsText(e.target.value)}
-                placeholder={"exemple.com\nautre-domaine.net\nsite-web.org"}
+                placeholder="exemple.com&#10;autre-domaine.net&#10;site-web.org"
                 className="w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 h-40 resize-y font-mono"
                 disabled={isLoading}
               />

@@ -1,22 +1,41 @@
+# Fichier: docker-compose.yml
 version: '3.8'
 
 services:
   frontend:
-    build:
-      context: ./frontend
+    build: ./frontend
     ports:
       - "3005:3000"
+    volumes:
+      # Le frontend lit le fichier de statut depuis le volume partagé
+      - status_data:/app/data
     depends_on:
       - backend-api
 
   backend-api:
-    build:
-      context: ./backend
+    build: ./backend
     ports:
-      - "8000:8000" # Expose le port de l'API
+      - "8000:8000"
     volumes:
-      # On garde un volume pour que la liste des domaines soit persistante
+      # L'API lit et écrit dans la liste des domaines
       - api_data:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+  # NOUVEAU : Service dédié à la tâche de fond
+  backend-cron:
+    build: ./backend
+    volumes:
+      # La tâche de fond lit la liste des domaines...
+      - api_data:/app
+      # ...et écrit le rapport de statut
+      - status_data:/app/data
+    command: >
+      sh -c "while true; do 
+               python cron_job.py; 
+               echo 'Tâche de fond terminée. Prochaine exécution dans 24 heures.'; 
+               sleep 86400; 
+             done"
 
 volumes:
   api_data:
+  status_data: # Le volume partagé pour le rapport JSON

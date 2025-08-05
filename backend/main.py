@@ -2,27 +2,33 @@
 
 import json
 import re
-from typing import List
+import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from monitor_logic import get_ssl_expiry_info
+from typing import List
 
-app = FastAPI()
+# On importe la fonction de vérification depuis notre script de la tâche de fond
+from cron_job import get_ssl_expiry_info
 
-# --- Configuration CORS ---
-# Permet au frontend (tournant sur un autre port) d'appeler cette API
+# --- Configuration de l'application FastAPI ---
+app = FastAPI(
+    title="SSL-Cert-Monitor API",
+    description="API pour gérer la liste des domaines à surveiller.",
+    version="1.0.0",
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Pour la simplicité, on autorise tout. En production, mettez l'URL de votre frontend.
+    allow_origins=["*"],  # Pour le développement. En production, limitez à l'URL de votre frontend.
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# --- Constantes et Modèles Pydantic ---
 DOMAINS_FILE = "domains.json"
 
-# --- Modèles Pydantic pour la validation des données entrantes ---
 class Domain(BaseModel):
     name: str
 
@@ -34,70 +40,66 @@ def read_domains() -> List[str]:
     """Lit la liste des domaines depuis le fichier JSON."""
     try:
         with open(DOMAINS_FILE, "r") as f:
-            domains = json.load(f)
-            return domains
+            return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        # Si le fichier n'existe pas ou est vide/corrompu, on retourne une liste vide
+        # Si le fichier n'existe pas ou est vide/corrompu, on retourne une liste vide.
         return []
 
 def write_domains(domains: List[str]):
-    """Écrit la liste des domaines dans le fichier JSON, en s'assurant qu'elle est unique et triée."""
-    # Utiliser un set pour garantir l'unicité puis reconvertir en liste triée
+    """Écrit la liste des domaines dans le fichier JSON, en s'assurant de l'unicité et de l'ordre."""
+    # set() pour garantir l'unicité, sorted() pour un ordre prévisible
     unique_sorted_domains = sorted(list(set(domains)))
     with open(DOMAINS_FILE, "w") as f:
         json.dump(unique_sorted_domains, f, indent=2)
 
-# --- Points de terminaison (endpoints) de l'API ---
 
-@app.get("/api/status")
-async def get_all_statuses():
-    """Récupère et vérifie le statut de tous les domaines enregistrés."""
-    domains = read_domains()
-    # Utilisation d'une liste en compréhension pour appeler la fonction de vérification sur chaque domaine
-    statuses = [get_ssl_expiry_info(domain) for domain in domains]
-    return statuses
+# --- Endpoints de l'API ---
 
-@app.post("/api/domains")
-async def add_domain(domain: Domain):
-    """Ajoute un nouveau domaine unique à la liste de surveillance."""
-    domains = read_domains()
-    if domain.name in domains:
-        raise HTTPException(status_code=409, detail="Le domaine existe déjà.")
-    domains.append(domain.name)
-    write_domains(domains)
-    return {"message": f"Domaine '{domain.name}' ajouté avec succès.", "domain": domain.name}
+@app.get("/api/check/{domain_name}", summary="Vérifier un seul domaine")
+async def check_single_domain(domain_name: str):
+    """
+    Exécute une vérification SSL/TLS pour un seul domaine spécifié et retourne son statut immédiatement.
+    C'est utilisé pour le feedback instantané lors de l'ajout d'un nouveau domaine.
+    """
+    return await get_ssl_expiry_info(domain_name)
 
-@app.post("/api/domains/bulk")
+@app.post("/api/domains/bulk", summary="Ajouter des domaines en masse")
 async def add_bulk_domains(domain_list: DomainList):
-    """Ajoute une liste de domaines, en ignorant les doublons et les formats invalides."""
+    """
+    Ajoute une liste de domaines. Valide le format, ignore les doublons
+    et les domaines déjà existants.
+    """
     current_domains = read_domains()
-    
-    # Expression régulière pour valider le format de base d'un nom de domaine
     domain_regex = re.compile(
-        r'^(?:[a-zA-Z0-9]'  # Doit commencer par une lettre ou un chiffre
-        r'(?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)' # Sous-domaines
-        r'+[a-zA-Z]{2,}$' # TLD (Top-Level Domain)
+        r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
     )
     
     valid_new_domains = {
-        domain.strip() for domain in domain_list.domains 
-        if domain.strip() and domain_regex.match(domain.strip()) and domain.strip() not in current_domains
+        domain.strip().lower() for domain in domain_list.domains 
+        if domain_regex.match(domain.strip()) and domain.strip().lower() not in current_domains
     }
     
     if not valid_new_domains:
-        raise HTTPException(status_code=400, detail="Aucun nouveau domaine valide à ajouter.")
+        raise HTTPException(
+            status_code=400, 
+            detail="Aucun nouveau domaine valide à ajouter. Ils sont peut-être déjà dans la liste ou leur format est invalide."
+        )
         
     updated_domains = current_domains + list(valid_new_domains)
     write_domains(updated_domains)
     
-    return {"message": f"{len(valid_new_domains)} nouveau(x) domaine(s) ajouté(s) avec succès."}
+    return {"message": f"{len(valid_new_domains)} nouveau(x) domaine(s) ajouté(s)."}
 
-@app.delete("/api/domains/{domain_name}")
+@app.delete("/api/domains/{domain_name}", summary="Supprimer un domaine")
 async def delete_domain(domain_name: str):
     """Supprime un domaine de la liste de surveillance."""
     domains = read_domains()
-    if domain_name not in domains:
+    domain_to_delete = domain_name.lower()
+
+    if domain_to_delete not in domains:
         raise HTTPException(status_code=404, detail="Domaine non trouvé.")
-    domains.remove(domain_name)
+    
+    domains.remove(domain_to_delete)
     write_domains(domains)
-    return {"message": f"Domaine '{domain_name}' supprimé avec succès."}
+    
+    return {"message": f"Domaine '{domain_name}' supprimé."}
