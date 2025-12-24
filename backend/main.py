@@ -53,3 +53,7 @@ async def delete_domain(domain_name: str):
     domains.remove(domain_name)
     write_domains(domains)
     return {"message": f"Domaine '{domain_name}' supprimé."}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
