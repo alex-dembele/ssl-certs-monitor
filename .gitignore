@@ -4,3 +4,4 @@ __pycache__/
 ssl_status.json
 config.json
 .env
+domain.txt

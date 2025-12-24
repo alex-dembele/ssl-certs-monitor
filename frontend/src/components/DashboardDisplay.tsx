@@ -12,7 +12,7 @@ import CertificateDetailModal from "./CertificateDetailModal";
 // --- Types et Constantes ---
 export interface Certificate {
   domain: string;
-  status: 'OK' | 'Expire bientôt' | 'Expiré' | 'Erreur' | 'Vérification...';
+  status: 'OK' | 'Expire bientôt' | 'Expiré' | 'Erreur' | 'En attente' | 'Vérification...';
   days_left?: number;
   expiry_date?: string;
   error_message?: string;
@@ -29,6 +29,7 @@ const StatusBadge = ({ status }: { status: Certificate['status'] }) => {
         'Expire bientôt': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30 animate-pulse',
         'Expiré': 'bg-red-500/20 text-red-400 border-red-500/30',
         'Erreur': 'bg-red-500/20 text-red-400 border-red-500/30',
+        'En attente': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
         'Vérification...': 'bg-blue-500/20 text-blue-400 border-blue-500/30 animate-spin',
       };
       return <span className={`px-3 py-1 text-xs font-medium rounded-full border ${colorClasses[status]}`}>{status}</span>;
@@ -44,17 +45,20 @@ const CertificateCard = ({ cert, onCardClick, onDeleteClick }: { cert: Certifica
         <div>
             <div className="flex justify-between items-start mb-4">
                 <h2 className="font-bold text-lg text-slate-200 break-all pr-2">{cert.domain}</h2>
-                <button onClick={(e) => { e.stopPropagation(); onDeleteClick(cert.domain); }} className="text-slate-500 hover:text-red-500 transition-colors z-10 flex-shrink-0" aria-label={`Supprimer ${cert.domain}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                </button>
+                <div className="flex items-center gap-2">
+                    <StatusBadge status={cert.status} />
+                    <button onClick={(e) => { e.stopPropagation(); onDeleteClick(cert.domain); }} className="text-slate-500 hover:text-red-500 transition-colors z-10 flex-shrink-0" aria-label={`Supprimer ${cert.domain}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </div>
             </div>
         </div>
-        {(cert.status !== 'Erreur' && cert.status !== 'Vérification...') ? (
+        {(cert.status !== 'Erreur' && cert.status !== 'En attente' && cert.status !== 'Vérification...') ? (
             <div className="flex items-end justify-between mt-4">
                 <div><p className="text-sm text-slate-400">Expiration</p><p className="text-xs text-slate-500">{cert.expiry_date ? new Date(cert.expiry_date).toLocaleDateString('fr-FR') : 'Inconnue'}</p></div>
                 {cert.days_left !== undefined && <ExpirationGauge daysLeft={cert.days_left} />}
             </div>
-        ) : (<div className="bg-slate-800/50 p-3 rounded-lg text-xs text-slate-300 flex items-center justify-center h-full mt-4 min-h-[52px]">{cert.status === 'Vérification...' ? 'Vérification en cours...' : cert.error_message}</div>)}
+        ) : (<div className="bg-slate-800/50 p-3 rounded-lg text-xs text-slate-300 flex items-center justify-center h-full mt-4 min-h-[52px]">{cert.status === 'En attente' ? 'En attente de la vérification...' : cert.status === 'Vérification...' ? 'Vérification en cours...' : cert.error_message}</div>)}
     </motion.div>
 );
 
@@ -69,6 +73,7 @@ const SkeletonCard = () => (
     </div>
 );
 
+
 // --- Composant principal du Dashboard ---
 export default function DashboardDisplay() {
     const [certificates, setCertificates] = useState<Certificate[]>([]);
@@ -82,24 +87,32 @@ export default function DashboardDisplay() {
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
     const fetchInitialData = useCallback(async () => {
+        if (!isLoading) setIsLoading(true);
         try {
-            const res = await fetch(`/ssl_status.json?t=${new Date().getTime()}`);
-            if (res.status === 404) {
-                setCertificates([]);
-                return;
-            }
-            if (!res.ok) throw new Error("Le fichier de statut est inaccessible.");
-            const data: Certificate[] = await res.json();
-            setCertificates(data);
+            const [statusRes, domainsRes] = await Promise.all([
+                fetch(`/ssl_status.json?t=${new Date().getTime()}`),
+                fetch(`${API_URL}/api/domains`)
+            ]);
+            
+            const statuses: Certificate[] = statusRes.ok ? await statusRes.json() : [];
+            const { domains }: { domains: string[] } = domainsRes.ok ? await domainsRes.json() : { domains: [] };
+            const statusMap = new Map(statuses.map(s => [s.domain, s]));
+
+            const mergedCertificates = domains.map(domain => {
+                const status = statusMap.get(domain);
+                if (status) return status;
+                return { domain, status: 'En attente' } as Certificate;
+            });
+            setCertificates(mergedCertificates);
             setError(null);
         } catch (err) {
-            if (err instanceof Error) { setError(err.message); }
+            if (err instanceof Error) { setError(err.message); } 
             else { setError("Une erreur de type inconnu est survenue."); }
             setCertificates([]);
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [isLoading]);
 
     useEffect(() => {
         fetchInitialData();
@@ -108,40 +121,44 @@ export default function DashboardDisplay() {
     }, [fetchInitialData]);
 
     const handleDomainsAdded = (newDomains: string[]) => {
-        const placeholderCerts: Certificate[] = newDomains.map(domain => ({ domain, status: 'Vérification...' }));
+        const placeholderCerts: Certificate[] = newDomains.map(domain => ({
+            domain,
+            status: 'Vérification...',
+        }));
         setCertificates(prevCerts => [...prevCerts, ...placeholderCerts]);
 
         newDomains.forEach(async (domain) => {
             try {
                 const res = await fetch(`${API_URL}/api/check/${domain}`);
-                if (!res.ok) throw new Error("La vérification a échoué");
+                if (!res.ok) throw new Error("La vérification a échoué.");
                 const checkedCert: Certificate = await res.json();
-                setCertificates(prevCerts => prevCerts.map(cert => cert.domain === domain ? checkedCert : cert));
+                setCertificates(prevCerts => 
+                    prevCerts.map(cert => cert.domain === domain ? checkedCert : cert)
+                );
             } catch (e) {
-                setCertificates(prevCerts => prevCerts.map(cert => cert.domain === domain ? { ...cert, status: 'Erreur', error_message: 'Échec de la vérification' } : cert));
+                setCertificates(prevCerts => 
+                    prevCerts.map(cert => cert.domain === domain ? { ...cert, status: 'Erreur', error_message: 'Échec de la vérification' } : cert)
+                );
             }
         });
     };
-
+    
     const handleDelete = async (domain: string) => {
         if (!window.confirm(`Êtes-vous sûr de vouloir supprimer ${domain} ?`)) return;
-        const originalCerts = [...certificates];
-        setCertificates(certs => certs.filter(c => c.domain !== domain));
+        
         const toastId = toast.loading(`Suppression de ${domain}...`);
         try {
             const response = await fetch(`${API_URL}/api/domains/${domain}`, { method: 'DELETE' });
-            toast.dismiss(toastId);
             if (!response.ok) {
-                setCertificates(originalCerts);
                 const errorData = await response.json();
                 throw new Error(errorData.detail || "Erreur lors de la suppression.");
             }
-            toast.success(`Domaine '${domain}' supprimé !`);
+            toast.success(`Domaine '${domain}' supprimé !`, {id: toastId});
+            await fetchInitialData();
         } catch (err) {
             toast.dismiss(toastId);
             if (err instanceof Error) toast.error(err.message);
             else toast.error("Erreur inconnue lors de la suppression.");
-            setCertificates(originalCerts);
         }
     };
 
