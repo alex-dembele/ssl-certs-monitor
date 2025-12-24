@@ -1,0 +1,23 @@
+services:
+  # Backend Service
+  - type: web
+    name: ssl-monitor-backend
+    env: python
+    buildCommand: cd backend && pip install -r requirements.txt
+    startCommand: cd backend && python main.py
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: PYTHON_VERSION
+        value: 3.10
+    healthCheckPath: /health
+
+  # Frontend Service
+  - type: web
+    name: ssl-monitor-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/build
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://ssl-monitor-backend.onrender.com
