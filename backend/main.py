@@ -1,6 +1,7 @@
 # Fichier: backend/main.py
 import json
 import re
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -15,6 +16,7 @@ app.add_middleware(
 )
 
 DOMAINS_FILE = "domains.json"
+STATUS_FILE = "/app/data/ssl_status.json"
 class DomainList(BaseModel): domains: List[str]
 
 def read_domains() -> List[str]:
@@ -29,6 +31,17 @@ def write_domains(domains: List[str]):
 @app.get("/api/domains")
 async def get_domains():
     return {"domains": read_domains()}
+
+@app.get("/api/status")
+async def get_status():
+    try:
+        if os.path.exists(STATUS_FILE):
+            with open(STATUS_FILE, "r") as f:
+                return json.load(f)
+        else:
+            return []
+    except Exception:
+        return []
 
 @app.post("/api/domains/bulk")
 async def add_bulk_domains(domain_list: DomainList):

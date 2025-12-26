@@ -92,12 +92,12 @@ export default function DashboardDisplay() {
         if (!isLoading) setIsLoading(true);
         try {
             const [statusRes, domainsRes] = await Promise.all([
-                fetch(`/ssl_status.json?t=${new Date().getTime()}`),
-                fetch(`${API_URL}/api/domains`)
+                fetch(`${API_URL}/api/status?t=${new Date().getTime()}`).catch(() => ({ ok: false })),
+                fetch(`${API_URL}/api/domains`).catch(() => ({ ok: false }))
             ]);
             
-            const statuses: Certificate[] = statusRes.ok ? await statusRes.json() : [];
-            const { domains }: { domains: string[] } = domainsRes.ok ? await domainsRes.json() : { domains: [] };
+            const statuses: Certificate[] = statusRes.ok ? await statusRes.json().catch(() => []) : [];
+            const { domains }: { domains: string[] } = domainsRes.ok ? await domainsRes.json().catch(() => ({ domains: [] })) : { domains: [] };
             const statusMap = new Map(statuses.map(s => [s.domain, s]));
 
             const mergedCertificates = domains.map(domain => {
