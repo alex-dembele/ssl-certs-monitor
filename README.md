@@ -45,14 +45,19 @@ The application consists of a backend service for certificate checking and a fro
    cd ssl-certs-monitor
    ```
 
-2. Build and start the containers:
+2. Create a `.env` file (copy from `.env.example`):
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Build and start the containers:
    ```
    docker-compose up -d --build
    ```
 
-3. The application should now be running:
-   - Frontend: http://localhost:3000 (or configured port)
-   - Backend: http://localhost:5000 (or configured port)
+4. The application should now be running:
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8000
 
 ### Manual Installation (Without Docker)
 
@@ -72,7 +77,7 @@ The application consists of a backend service for certificate checking and a fro
 
 3. Run the backend server:
    ```
-   python main.py  # Or the entry point file, e.g., app.py
+   uvicorn main:app --reload
    ```
 
 #### Frontend Setup
@@ -84,42 +89,84 @@ The application consists of a backend service for certificate checking and a fro
 
 2. Install dependencies:
    ```
-   npm install  # Or yarn install
+   npm install
    ```
 
-3. Start the development server:
+3. Create a `.env.local` file:
    ```
-   npm start  # Or yarn start
+   NEXT_PUBLIC_API_URL=http://localhost:8000
    ```
+
+4. Start the development server:
+   ```
+   npm run dev
+   ```
+
+## Deployment
+
+### Free Deployment Options
+
+This project can be deployed for **free** on several platforms:
+
+#### 🚀 **Render.com** (Recommended)
+- **Plan**: Free tier (750 hours/month per service)
+- **Deploy in 1 click**: [Deploy to Render](https://render.com/deploy?repo=https://github.com/alex-dembele/ssl-certs-monitor)
+- Frontend: `ssl-cert-monitor-frontend.onrender.com`
+- Backend: `ssl-cert-monitor-api.onrender.com`
+
+#### 🚂 **Railway.app**
+- **Plan**: Free $5/month credit
+- Very intuitive interface
+- Perfect for microservices
+
+#### 🚀 **Fly.io**
+- **Plan**: Always free (3 instances limit)
+- Global performance
+- Deploy with: `flyctl deploy`
+
+#### **Vercel** (Frontend only)
+- Perfect for Next.js
+- Deploy to Vercel with one click
+- Set `NEXT_PUBLIC_API_URL` environment variable
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed step-by-step instructions for each platform.
 
 ## Usage
 
 1. **Access the Dashboard**: Open your browser and go to the frontend URL (e.g., http://localhost:3000).
 2. **Add Domains**: Use the interface to add domains you want to monitor (e.g., example.com).
 3. **View Status**: The dashboard displays current certificate status, expiration dates, and validity.
-4. **Configure Alerts**: Set up thresholds for expiration warnings (e.g., alert 30 days before expiry).
-5. **Historical View**: Check the history tab to see changes in certificate details over time.
-
-For API usage (if exposed):
-- GET `/api/certificates`: Retrieve list of monitored certificates.
-- POST `/api/domains`: Add a new domain to monitor.
-
-Refer to the API documentation in the backend for more endpoints (if available).
+4. **Configure Alerts**: Email alerts can be configured via environment variables.
+5. **Automatic Checks**: The backend cron job automatically checks certificates daily.
 
 ## Configuration
 
-Configuration files are located in the respective directories:
+### Environment Variables
 
-- **Backend**: Edit `config.py` or `.env` for settings like database URL, check intervals, or notification emails.
-- **Frontend**: Update `src/config.ts` for API base URL or other client-side settings.
-- **Environment Variables**: Use a `.env` file for sensitive information (e.g., API keys if any).
+Copy `.env.example` to `.env` and configure:
 
-Example `.env`:
+```env
+# Backend API Configuration
+API_URL=http://localhost:8000
+
+# Frontend
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# Email Alerts (Optional)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SENDER_EMAIL=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+ALERT_RECIPIENTS=recipient@example.com
 ```
-DATABASE_URL=postgresql://user:password@localhost/db
-CHECK_INTERVAL=3600  # In seconds
-EMAIL_ALERTS=true
-```
+
+### API Endpoints
+
+- `GET /api/domains` - List all monitored domains
+- `POST /api/domains/bulk` - Add multiple domains
+- `DELETE /api/domains/{domain_name}` - Remove a domain
+- `GET /api/check/{domain_name}` - Check single domain certificate
+- `GET /health` - Health check endpoint
 
 ## Contributing
 
@@ -139,6 +186,6 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contact
 
-For questions or support, open an issue on GitHub or contact the maintainer at [alex.dembele@example.com](mailto:alex.dembele@example.com).
+For questions or support, open an issue on GitHub or contact the maintainer.
 
 Thank you for using SSL Certificates Monitor! 🔒

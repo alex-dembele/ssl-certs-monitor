@@ -1,23 +1,39 @@
 services:
-  # Backend Service
+  # Backend API Service
   - type: web
-    name: ssl-monitor-backend
-    env: python
-    buildCommand: cd backend && pip install -r requirements.txt
-    startCommand: cd backend && python main.py
-    envVars:
-      - key: PORT
-        value: 8000
-      - key: PYTHON_VERSION
-        value: 3.10
+    name: ssl-cert-monitor-api
+    runtime: python:3.10
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port 8000
+    rootDir: backend
+    plan: free
     healthCheckPath: /health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: 1
 
   # Frontend Service
   - type: web
-    name: ssl-monitor-frontend
-    env: static
-    buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: ./frontend/build
+    name: ssl-cert-monitor-frontend
+    runtime: node:18
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    rootDir: frontend
+    plan: free
     envVars:
-      - key: REACT_APP_API_URL
-        value: https://ssl-monitor-backend.onrender.com
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: ssl-cert-monitor-api
+          property: url
+
+  # Background Cron Worker
+  - type: background_worker
+    name: ssl-cert-monitor-cron
+    runtime: python:3.10
+    buildCommand: pip install -r requirements.txt
+    startCommand: python cron_job.py
+    rootDir: backend
+    plan: free
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: 1

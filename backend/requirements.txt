@@ -1,2 +1,5 @@
-fastapi
-uvicorn[standard]
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+cryptography==41.0.7
+python-dotenv==1.0.0
