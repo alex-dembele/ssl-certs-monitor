@@ -11,12 +11,12 @@ RUN npm run build
 # Étape 2: Servir l'application optimisée
 FROM node:20-alpine AS runner
 WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/package*.json ./
 
 EXPOSE 3000
-# CORRECTION ICI
 ENV PORT=3000
 
-CMD ["node", "server.js"]
+CMD ["npm", "start"]
