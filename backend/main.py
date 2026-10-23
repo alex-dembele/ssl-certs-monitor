@@ -3,9 +3,10 @@ import re
 import os
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
-from database import SessionLocal, add_domains, delete_domain as remove_domain, initialize_database, list_domains, list_statuses
+from database import Domain, SessionLocal, add_domains, delete_domain as remove_domain, initialize_database, list_domains, list_statuses
+from alerts import AlertPolicy, get_policy
 # On importe la fonction de check unique
 from cron_job import get_ssl_expiry_info
 
@@ -28,6 +29,11 @@ app.add_middleware(
 )
 
 class DomainList(BaseModel): domains: List[str]
+class AlertPolicyUpdate(BaseModel):
+    threshold_days: int = Field(default=30, ge=1, le=3650)
+    reminder_interval_hours: int = Field(default=168, ge=0, le=8760)
+    enabled: bool = True
+    channel: str = Field(default="email", pattern="^email$")
 
 initialize_database()
 
@@ -69,6 +75,34 @@ async def delete_domain(domain_name: str):
     if not deleted:
         raise HTTPException(status_code=404, detail="Domaine non trouvé.")
     return {"message": f"Domaine '{domain_name}' supprimé."}
+
+@app.get("/api/domains/{domain_name}/alert-policy", dependencies=[Depends(require_api_auth)])
+async def get_alert_policy(domain_name: str):
+    with SessionLocal() as session:
+        if not session.get(Domain, domain_name):
+            raise HTTPException(status_code=404, detail="Domaine non trouvé.")
+        policy = get_policy(session, domain_name)
+        return {
+            "domain": domain_name,
+            "threshold_days": policy.threshold_days,
+            "reminder_interval_hours": policy.reminder_interval_hours,
+            "enabled": policy.enabled,
+            "channel": policy.channel,
+        }
+
+@app.put("/api/domains/{domain_name}/alert-policy", dependencies=[Depends(require_api_auth)])
+async def update_alert_policy(domain_name: str, update: AlertPolicyUpdate):
+    with SessionLocal() as session:
+        if not session.get(Domain, domain_name):
+            raise HTTPException(status_code=404, detail="Domaine non trouvé.")
+        policy = session.get(AlertPolicy, domain_name) or AlertPolicy(domain_name=domain_name)
+        policy.threshold_days = update.threshold_days
+        policy.reminder_interval_hours = update.reminder_interval_hours
+        policy.enabled = update.enabled
+        policy.channel = update.channel
+        session.add(policy)
+        session.commit()
+        return {"message": "Politique d'alerte mise à jour.", **update.model_dump()}
 
 @app.get("/health")
 async def health_check():
