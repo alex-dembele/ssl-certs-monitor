@@ -132,13 +132,17 @@ export default function DashboardDisplay() {
     }, [fetchInitialData]);
 
     const handleDomainsAdded = (newDomains: string[]) => {
-        const placeholderCerts: Certificate[] = newDomains.map(domain => ({
+        const uniqueDomains = [...new Set(newDomains)];
+        const placeholderCerts: Certificate[] = uniqueDomains.map(domain => ({
             domain,
             status: 'Vérification...',
         }));
-        setCertificates(prevCerts => [...prevCerts, ...placeholderCerts]);
+        setCertificates(prevCerts => {
+            const existing = new Set(prevCerts.map(cert => cert.domain));
+            return [...prevCerts, ...placeholderCerts.filter(cert => !existing.has(cert.domain))];
+        });
 
-        newDomains.forEach(async (domain) => {
+        uniqueDomains.forEach(async (domain) => {
             try {
                 const res = await fetch(`${API_BASE_URL}/api/check/${domain}`);
                 if (!res.ok) throw new Error("La vérification a échoué.");
