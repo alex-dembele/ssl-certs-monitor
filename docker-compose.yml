@@ -8,6 +8,7 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://backend-api:8000
+      - BACKEND_API_TOKEN=${BACKEND_API_TOKEN:-}
     volumes:
       - status_data:/app/public/data # Le frontend lit le rapport ici
     depends_on:
@@ -24,6 +25,9 @@ services:
       - status_data:/app/data # L'API lit le statut
     environment:
       - PYTHONUNBUFFERED=1
+      - BACKEND_API_TOKEN=${BACKEND_API_TOKEN:-}
+      - APP_ENV=${APP_ENV:-development}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
     dns: [ "8.8.8.8", "1.1.1.1" ]
     restart: unless-stopped
     healthcheck:
