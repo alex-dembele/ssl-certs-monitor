@@ -170,6 +170,22 @@ ALERT_RECIPIENTS=recipient@example.com
 
 Les domaines et les derniers statuts sont stockés dans PostgreSQL via `DATABASE_URL`. Au premier démarrage, `LEGACY_DOMAINS_FILE` permet d'importer les domaines de l'ancien fichier JSON ; cette migration est idempotente. Avec Docker Compose, PostgreSQL et le volume persistant sont configurés automatiquement.
 
+### Vérifications locales
+
+```bash
+cd backend
+python -m pytest tests -q
+python -m compileall -q .
+
+cd ../frontend
+npm ci
+npm run lint
+npm run typecheck
+npm run build
+```
+
+Ces mêmes contrôles sont exécutés automatiquement par [la CI](.github/workflows/ci.yml) sur chaque pull request et chaque push vers `main`.
+
 ### API Endpoints
 
 - `GET /api/domains` - List all monitored domains
