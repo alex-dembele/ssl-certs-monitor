@@ -18,7 +18,7 @@
 4. Configurer:
    - Build Command: `npm install && npm run build` (pour le frontend)
    - Start Command: `npm start`
-   - Environment: `NEXT_PUBLIC_API_URL=https://votre-api.onrender.com`
+   - Environment: `BACKEND_API_URL=https://votre-api.onrender.com`
 5. Pour le backend, créer un autre service avec:
    - Build Command: `pip install -r requirements.txt`
    - Start Command: `uvicorn main:app --host 0.0.0.0 --port 8000`
@@ -76,7 +76,7 @@
 1. Pousser sur GitHub
 2. Aller sur [vercel.com](https://vercel.com)
 3. Importer le project
-4. Configurer: `NEXT_PUBLIC_API_URL=https://votre-api.fly.io`
+4. Configurer: `BACKEND_API_URL=https://votre-api.fly.io`
 5. Déployer
 
 **Temps de déploiement:** 2 minutes
@@ -99,7 +99,7 @@ git push origin develop  # ✅ Déjà fait
    - **Environment:** Docker
    - **Root Directory:** frontend
    - **Environment Variables:**
-     - `NEXT_PUBLIC_API_URL=https://ssl-cert-monitor-api.onrender.com`
+     - `BACKEND_API_URL=https://ssl-cert-monitor-api.onrender.com`
 
 ### Étape 3: Créer le service Backend API sur Render
 1. Cliquer "New +" → "Web Service"
@@ -168,7 +168,7 @@ Domaines gratuits (.tk, .ml, .ga) sur [freenom.com](https://freenom.com)
 1. **Variables d'environnement:** 
    - Ne jamais commit `.env`
    - Utiliser le panel de chaque service pour les secrets
-   - Bien configurer `NEXT_PUBLIC_API_URL`
+   - Bien configurer `BACKEND_API_URL`
 
 2. **Partage des volumes:**
    - Render n'a pas de partage de volume persistent entre services

@@ -94,7 +94,7 @@ The application consists of a backend service for certificate checking and a fro
 
 3. Create a `.env.local` file:
    ```
-   NEXT_PUBLIC_API_URL=http://localhost:8000
+   BACKEND_API_URL=http://localhost:8000
    ```
 
 4. Start the development server:
@@ -127,7 +127,7 @@ This project can be deployed for **free** on several platforms:
 #### **Vercel** (Frontend only)
 - Perfect for Next.js
 - Deploy to Vercel with one click
-- Set `NEXT_PUBLIC_API_URL` environment variable
+- Set `BACKEND_API_URL` environment variable on the frontend service
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed step-by-step instructions for each platform.
 
@@ -150,7 +150,7 @@ Copy `.env.example` to `.env` and configure:
 API_URL=http://localhost:8000
 
 # Frontend
-NEXT_PUBLIC_API_URL=http://localhost:8000
+BACKEND_API_URL=http://localhost:8000
 
 # Email Alerts (Optional)
 SMTP_SERVER=smtp.gmail.com

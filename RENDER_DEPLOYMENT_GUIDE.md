@@ -170,7 +170,7 @@ Cliquer **"Add Environment Variable"**
 
 | Clé | Valeur |
 |-----|--------|
-| `NEXT_PUBLIC_API_URL` | Laisser vide pour le moment |
+| `BACKEND_API_URL` | URL publique du backend, par exemple `https://ssl-cert-monitor-api.onrender.com` |
 
 Après le déploiement du frontend:
 - Modifier cette variable
@@ -238,7 +238,7 @@ Après avoir déployé l'API:
 1. Aller sur le dashboard Render
 2. Cliquer sur **`ssl-cert-monitor-frontend`**
 3. Cliquer sur l'onglet **"Environment"**
-4. Trouver la variable `NEXT_PUBLIC_API_URL`
+4. Trouver la variable `BACKEND_API_URL`
 5. Modifier sa valeur:
    ```
    https://ssl-cert-monitor-api.onrender.com
@@ -327,7 +327,7 @@ Pour chaque service:
 ### Problème: Frontend ne communique pas avec l'API
 
 **Solution:**
-1. Vérifier `NEXT_PUBLIC_API_URL` sur le frontend
+1. Vérifier `BACKEND_API_URL` sur le frontend
 2. Elle doit être: `https://ssl-cert-monitor-api.onrender.com`
 3. Pas `http://` mais `https://`
 4. Sauvegarder et attendre le redéploiement

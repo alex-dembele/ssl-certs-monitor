@@ -49,7 +49,7 @@ Les deux sont en erreur "Build failed" - c'est normal, on va corriger ça avec l
 
 | Clé | Valeur | Explication |
 |-----|--------|-------------|
-| `NEXT_PUBLIC_API_URL` | `https://ssl-cert-monitor-api.onrender.com` (ou l'URL Railway si déployée là) | URL de l'API |
+| `BACKEND_API_URL` | `https://ssl-cert-monitor-api.onrender.com` (ou l'URL Railway si déployée là) | URL de l'API côté serveur |
 | `PORT` | `3000` | Port d'écoute du frontend |
 | `NODE_ENV` | `production` | Environnement de production |
 
@@ -76,7 +76,7 @@ Les deux sont en erreur "Build failed" - c'est normal, on va corriger ça avec l
 4. Aller à l'onglet **"Settings"** ou **"Deployments"**
 5. Tu verras l'URL comme: `https://ssl-cert-monitor-api-xxx.railway.app`
 
-**Copie cette URL** et mets-la dans la variable `NEXT_PUBLIC_API_URL` du frontend.
+**Copie cette URL** et mets-la dans la variable `BACKEND_API_URL` du frontend.
 
 ### Pour connaître l'URL Frontend sur Railway:
 
@@ -103,7 +103,7 @@ Les deux sont en erreur "Build failed" - c'est normal, on va corriger ça avec l
 ### ✅ Étape 3: Configurer Frontend
 - [ ] Aller dans `ssl-cert-monitor-frontend`
 - [ ] Aller à l'onglet Variables
-- [ ] Ajouter `NEXT_PUBLIC_API_URL` = `https://ssl-cert-monitor-api-xxx.railway.app` (l'URL copiée)
+- [ ] Ajouter `BACKEND_API_URL` = `https://ssl-cert-monitor-api-xxx.railway.app` (l'URL copiée)
 - [ ] Ajouter `PORT` = `3000`
 - [ ] Ajouter `NODE_ENV` = `production`
 - [ ] Cliquer "Save" ou "Deploy"
@@ -150,7 +150,7 @@ Quand tu changes une variable:
 ### Problème: Frontend ne communique pas avec l'API
 
 **Solution:**
-1. Vérifier que `NEXT_PUBLIC_API_URL` est correctement remplie
+1. Vérifier que `BACKEND_API_URL` est correctement remplie
 2. S'assurer que c'est en `https://` et pas `http://`
 3. Copier-coller l'URL directement sans erreur de typage
 4. Redéployer le frontend
@@ -178,7 +178,7 @@ ALERT_RECIPIENTS=mon-email@gmail.com
 
 ### Frontend - Variables finales
 ```
-NEXT_PUBLIC_API_URL=https://ssl-cert-monitor-api-xxx.railway.app
+BACKEND_API_URL=https://ssl-cert-monitor-api-xxx.railway.app
 PORT=3000
 NODE_ENV=production
 ```

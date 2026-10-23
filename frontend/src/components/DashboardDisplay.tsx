@@ -8,6 +8,7 @@ import { Toaster, toast } from 'react-hot-toast';
 import ExpirationGauge from "./ExpirationGauge";
 import AddDomainModal from "./AddDomainModal";
 import CertificateDetailModal from "./CertificateDetailModal";
+import { API_BASE_URL } from "@/lib/api";
 
 // --- Types et Constantes ---
 export interface Certificate {
@@ -19,10 +20,6 @@ export interface Certificate {
 }
 type SortKey = 'days_left' | 'domain';
 type SortDirection = 'asc' | 'desc';
-
-const API_URL = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_API_URL 
-  ? process.env.NEXT_PUBLIC_API_URL 
-  : (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8000` : "http://localhost:8000");
 
 // --- Sous-Composant : Badge de Statut ---
 const StatusBadge = ({ status }: { status: Certificate['status'] }) => {
@@ -95,8 +92,8 @@ export default function DashboardDisplay() {
         isRefreshingRef.current = true;
         setIsLoading(true);
         try {
-            const statusRes = await fetch(`${API_URL}/api/status?t=${new Date().getTime()}`).catch(() => null);
-            const domainsRes = await fetch(`${API_URL}/api/domains`).catch(() => null);
+            const statusRes = await fetch(`${API_BASE_URL}/api/status?t=${new Date().getTime()}`).catch(() => null);
+            const domainsRes = await fetch(`${API_BASE_URL}/api/domains`).catch(() => null);
             
             const statuses: Certificate[] = statusRes?.ok ? await statusRes.json().catch(() => []) : [];
             const { domains }: { domains: string[] } = domainsRes?.ok ? await domainsRes.json().catch(() => ({ domains: [] })) : { domains: [] };
@@ -139,7 +136,7 @@ export default function DashboardDisplay() {
 
         newDomains.forEach(async (domain) => {
             try {
-                const res = await fetch(`${API_URL}/api/check/${domain}`);
+                const res = await fetch(`${API_BASE_URL}/api/check/${domain}`);
                 if (!res.ok) throw new Error("La vérification a échoué.");
                 const checkedCert: Certificate = await res.json();
                 setCertificates(prevCerts => 
@@ -158,7 +155,7 @@ export default function DashboardDisplay() {
         
         const toastId = toast.loading(`Suppression de ${domain}...`);
         try {
-            const response = await fetch(`${API_URL}/api/domains/${domain}`, { method: 'DELETE' });
+            const response = await fetch(`${API_BASE_URL}/api/domains/${domain}`, { method: 'DELETE' });
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.detail || "Erreur lors de la suppression.");

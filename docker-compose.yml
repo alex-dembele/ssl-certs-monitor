@@ -7,7 +7,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend-api:8000
+      - BACKEND_API_URL=http://backend-api:8000
     volumes:
       - status_data:/app/public/data # Le frontend lit le rapport ici
     depends_on:
