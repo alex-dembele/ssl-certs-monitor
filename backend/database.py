@@ -1,13 +1,15 @@
 """Database access and the one-time migration from the legacy JSON store."""
 
+from __future__ import annotations
+
 import json
 import os
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, create_engine, select, text
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, create_engine, select, text
+from sqlalchemy.orm import DeclarativeBase, Session, relationship, sessionmaker
 
 
 class Base(DeclarativeBase):
@@ -17,8 +19,9 @@ class Base(DeclarativeBase):
 class Domain(Base):
     __tablename__ = "domains"
 
-    name: Mapped[str] = mapped_column(String(253), primary_key=True)
-    status: Mapped["CertificateStatus | None"] = relationship(
+    name = Column(String(253), primary_key=True)
+    status = relationship(
+        "CertificateStatus",
         back_populates="domain", cascade="all, delete-orphan", uselist=False
     )
 
@@ -26,15 +29,15 @@ class Domain(Base):
 class CertificateStatus(Base):
     __tablename__ = "certificate_statuses"
 
-    domain_name: Mapped[str] = mapped_column(
+    domain_name = Column(
         String(253), ForeignKey("domains.name", ondelete="CASCADE"), primary_key=True
     )
-    status: Mapped[str] = mapped_column(String(32), nullable=False)
-    days_left: Mapped[int | None] = mapped_column(nullable=True)
-    expiry_date: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    checked_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
-    domain: Mapped[Domain] = relationship(back_populates="status")
+    status = Column(String(32), nullable=False)
+    days_left = Column(Integer, nullable=True)
+    expiry_date = Column(String(64), nullable=True)
+    error_message = Column(Text, nullable=True)
+    checked_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    domain = relationship("Domain", back_populates="status")
 
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./ssl_monitor.db")

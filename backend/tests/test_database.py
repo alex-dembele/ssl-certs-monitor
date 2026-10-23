@@ -3,7 +3,7 @@ import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from database import Base, add_domains, delete_domain, list_domains, list_statuses, save_statuses
+from backend.database import Base, add_domains, delete_domain, list_domains, list_statuses, save_statuses
 
 
 def test_concurrent_safe_upserts_and_status_persistence(tmp_path):
