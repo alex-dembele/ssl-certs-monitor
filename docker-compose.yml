@@ -3,7 +3,10 @@ version: '3.8'
 
 services:
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        BACKEND_API_URL: http://backend-api:8000
     ports:
       - "3000:3000"
     environment:
@@ -12,7 +15,8 @@ services:
     volumes:
       - status_data:/app/public/data # Le frontend lit le rapport ici
     depends_on:
-      - backend-api
+      backend-api:
+        condition: service_healthy
     dns: [ "8.8.8.8", "1.1.1.1" ]
     restart: unless-stopped
 
@@ -36,7 +40,7 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
