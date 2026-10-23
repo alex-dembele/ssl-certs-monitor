@@ -168,6 +168,8 @@ ALERT_RECIPIENTS=recipient@example.com
 
 `BACKEND_API_TOKEN` protège les routes `/api/*` lorsqu'il est défini. Il doit être identique sur le backend et le frontend, et obligatoire avec `APP_ENV=production`. Le frontend transmet ce token côté serveur via le proxy Next.js ; il n'est pas exposé au navigateur. `CORS_ORIGINS` accepte une liste d'origines séparées par des virgules.
 
+Les canaux de notification disponibles sont `email`, `webhook`, `slack`, `teams` et `discord`. Les webhooks utilisent `ALERT_WEBHOOK_URL`/`ALERT_WEBHOOK_SECRET`; les intégrations dédiées utilisent respectivement `SLACK_WEBHOOK_URL`/`SLACK_WEBHOOK_SECRET`, `TEAMS_WEBHOOK_URL`/`TEAMS_WEBHOOK_SECRET` et `DISCORD_WEBHOOK_URL`/`DISCORD_WEBHOOK_SECRET`. Chaque livraison porte une clé d'idempotence et une signature HMAC avec timestamp.
+
 Les domaines et les derniers statuts sont stockés dans PostgreSQL via `DATABASE_URL`. Au premier démarrage, `LEGACY_DOMAINS_FILE` permet d'importer les domaines de l'ancien fichier JSON ; cette migration est idempotente. Avec Docker Compose, PostgreSQL et le volume persistant sont configurés automatiquement.
 
 ### Vérifications locales
@@ -191,6 +193,8 @@ Ces mêmes contrôles sont exécutés automatiquement par [la CI](.github/workfl
 - `GET /api/domains` - List all monitored domains
 - `POST /api/domains/bulk` - Add multiple domains
 - `DELETE /api/domains/{domain_name}` - Remove a domain
+- `GET /api/domains/{domain_name}/alert-policy` - Read a domain alert policy
+- `PUT /api/domains/{domain_name}/alert-policy` - Configure threshold, reminders and channel
 - `GET /api/check/{domain_name}` - Check single domain certificate
 - `GET /health` - Health check endpoint
 
