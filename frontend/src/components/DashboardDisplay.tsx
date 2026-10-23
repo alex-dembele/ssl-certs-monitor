@@ -145,7 +145,7 @@ export default function DashboardDisplay() {
                 setCertificates(prevCerts => 
                     prevCerts.map(cert => cert.domain === domain ? checkedCert : cert)
                 );
-            } catch (e) {
+            } catch {
                 setCertificates(prevCerts => 
                     prevCerts.map(cert => cert.domain === domain ? { ...cert, status: 'Erreur', error_message: 'Échec de la vérification' } : cert)
                 );
