@@ -63,10 +63,13 @@ def _render(events: list[AlertEvent]) -> str:
 class EmailChannel:
     name = "email"
 
+    def __init__(self, recipients: list[str] | None = None):
+        self.recipients = recipients
+
     def send(self, events: list[AlertEvent], idempotency_key: str) -> None:
         sender = os.getenv("SMTP_SENDER_EMAIL")
         password = os.getenv("SMTP_PASSWORD")
-        recipients = [item.strip() for item in os.getenv("ALERT_RECIPIENTS", "").split(",") if item.strip()]
+        recipients = self.recipients or [item.strip() for item in os.getenv("ALERT_RECIPIENTS", "").split(",") if item.strip()]
         server_name = os.getenv("SMTP_SERVER")
         if not all([sender, password, recipients, server_name]):
             raise RuntimeError("Configuration SMTP incomplète.")
@@ -137,9 +140,9 @@ def verify_webhook_signature(payload: bytes, timestamp: str, signature: str, sec
     return hmac.compare_digest(expected, signature)
 
 
-def deliver_events(events: list[AlertEvent], max_attempts: int = 3) -> list[DeliveryResult]:
+def deliver_events(events: list[AlertEvent], max_attempts: int = 3, email_recipients: list[str] | None = None) -> list[DeliveryResult]:
     channels: dict[str, NotificationChannel] = {
-        "email": EmailChannel(),
+        "email": EmailChannel(email_recipients),
         "webhook": WebhookChannel("ALERT_WEBHOOK_URL", "ALERT_WEBHOOK_SECRET"),
         "slack": SlackChannel("SLACK_WEBHOOK_URL", "SLACK_WEBHOOK_SECRET"),
         "teams": TeamsChannel("TEAMS_WEBHOOK_URL", "TEAMS_WEBHOOK_SECRET"),
