@@ -2,20 +2,13 @@
 
 import asyncio
 import ssl
-import json
 import os
 import smtplib
 from email.message import EmailMessage
 from datetime import datetime
 from typing import List, Dict
+from database import SessionLocal, initialize_database, list_domains, save_statuses
 
-# --- Constantes ---
-# Le fichier où l'API stocke la liste des domaines
-DOMAINS_FILE = "domains.json"
-# Le fichier de rapport partagé avec le frontend. Le chemin '/app/data' correspond au volume dans docker-compose.
-STATUS_FILE = "/app/data/ssl_status.json"
-# Fichier temporaire pour garantir une écriture "atomique" et éviter la corruption de données
-TEMP_STATUS_FILE = STATUS_FILE + ".tmp"
 # Seuil en jours pour considérer qu'un certificat "Expire bientôt"
 ALERT_THRESHOLD_DAYS = 30
 
@@ -92,34 +85,24 @@ async def get_ssl_expiry_info(hostname: str) -> Dict:
     except Exception as e:
         return {"domain": hostname, "status": "Erreur", "error_message": f"{type(e).__name__}: {e}"}
 
-def read_domains() -> List[str]:
-    """Lit la liste des domaines depuis le fichier JSON partagé."""
-    try:
-        with open(DOMAINS_FILE, "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
-
 # --- Fonction Principale du Script ---
 async def main():
     """Orchestre la vérification de masse et la génération de rapports."""
     print(f"--- Lancement de la tâche de fond de vérification SSL ({datetime.now()}) ---")
-    domains = read_domains()
+    initialize_database()
+    with SessionLocal() as session:
+        domains = list_domains(session)
     if not domains:
         print("Aucun domaine à vérifier. Tâche terminée.")
-        with open(STATUS_FILE, "w") as f:
-            json.dump([], f)
         return
 
     tasks = [get_ssl_expiry_info(domain) for domain in domains]
     results = await asyncio.gather(*tasks)
     
-    # Écriture "atomique" pour éviter les corruptions de fichier
-    with open(TEMP_STATUS_FILE, "w") as f:
-        json.dump(results, f, indent=2)
-    os.rename(TEMP_STATUS_FILE, STATUS_FILE)
+    with SessionLocal() as session:
+        save_statuses(session, results)
     
-    print(f"-> Vérification terminée. {len(results)} domaines traités. Rapport JSON mis à jour.")
+    print(f"-> Vérification terminée. {len(results)} domaines traités. Rapport mis à jour en base.")
 
     # Filtrage des certificats critiques et envoi de l'email
     critical_certs = [cert for cert in results if cert['status'] in ['Expire bientôt', 'Expiré', 'Erreur']]

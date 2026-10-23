@@ -1,11 +1,11 @@
 # Fichier: backend/main.py
-import json
 import re
 import os
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
+from database import SessionLocal, add_domains, delete_domain as remove_domain, initialize_database, list_domains, list_statuses
 # On importe la fonction de check unique
 from cron_job import get_ssl_expiry_info
 
@@ -27,48 +27,36 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-DOMAINS_FILE = "domains.json"
-STATUS_FILE = "/app/data/ssl_status.json"
 class DomainList(BaseModel): domains: List[str]
+
+initialize_database()
 
 async def require_api_auth(authorization: str | None = Header(default=None)):
     if backend_api_token and authorization != f"Bearer {backend_api_token}":
         raise HTTPException(status_code=401, detail="Authentification requise.")
 
-def read_domains() -> List[str]:
-    try:
-        with open(DOMAINS_FILE, "r") as f: return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        with open(DOMAINS_FILE, "w") as f: json.dump([], f)
-        return []
-def write_domains(domains: List[str]):
-    with open(DOMAINS_FILE, "w") as f: json.dump(sorted(list(set(domains))), f, indent=2)
-
 @app.get("/api/domains", dependencies=[Depends(require_api_auth)])
 async def get_domains():
-    return {"domains": read_domains()}
+    with SessionLocal() as session:
+        return {"domains": list_domains(session)}
 
 @app.get("/api/status", dependencies=[Depends(require_api_auth)])
 async def get_status():
-    try:
-        if os.path.exists(STATUS_FILE):
-            with open(STATUS_FILE, "r") as f:
-                return json.load(f)
-        else:
-            return []
-    except Exception:
-        return []
+    with SessionLocal() as session:
+        return list_statuses(session)
 
 @app.post("/api/domains/bulk", dependencies=[Depends(require_api_auth)])
 async def add_bulk_domains(domain_list: DomainList):
-    current_domains = read_domains()
     domain_regex = re.compile(r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
-    valid_new_domains = { d.strip() for d in domain_list.domains if domain_regex.match(d.strip()) and d.strip() not in current_domains }
-    if not valid_new_domains:
+    valid_domains = {d.strip() for d in domain_list.domains if domain_regex.match(d.strip())}
+    if not valid_domains:
         raise HTTPException(status_code=400, detail="Aucun nouveau domaine valide (format invalide ou doublon).")
-    
-    write_domains(current_domains + list(valid_new_domains))
-    return {"message": f"{len(valid_new_domains)} domaine(s) ajouté(s) à la liste de surveillance."}
+
+    with SessionLocal() as session:
+        added = add_domains(session, valid_domains)
+    if not added:
+        raise HTTPException(status_code=400, detail="Aucun nouveau domaine valide (format invalide ou doublon).")
+    return {"message": f"{added} domaine(s) ajouté(s) à la liste de surveillance."}
 
 @app.get("/api/check/{domain_name}", dependencies=[Depends(require_api_auth)])
 async def check_single_domain(domain_name: str):
@@ -76,11 +64,10 @@ async def check_single_domain(domain_name: str):
 
 @app.delete("/api/domains/{domain_name}", dependencies=[Depends(require_api_auth)])
 async def delete_domain(domain_name: str):
-    domains = read_domains()
-    if domain_name not in domains:
+    with SessionLocal() as session:
+        deleted = remove_domain(session, domain_name)
+    if not deleted:
         raise HTTPException(status_code=404, detail="Domaine non trouvé.")
-    domains.remove(domain_name)
-    write_domains(domains)
     return {"message": f"Domaine '{domain_name}' supprimé."}
 
 @app.get("/health")
