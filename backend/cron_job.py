@@ -13,8 +13,10 @@ from datetime import datetime
 from typing import List, Dict
 try:
     from .database import SessionLocal, initialize_database, list_domains, save_statuses
+    from .alerts import record_notification, select_alert_events
 except ImportError:
     from database import SessionLocal, initialize_database, list_domains, save_statuses
+    from alerts import record_notification, select_alert_events
 
 # Seuil en jours pour considérer qu'un certificat "Expire bientôt"
 ALERT_THRESHOLD_DAYS = 30
@@ -156,7 +158,7 @@ async def get_ssl_expiry_info(hostname: str) -> Dict:
             await asyncio.sleep(RETRY_BACKOFF * (2**attempt))
 
 # --- Logique d'envoi d'email ---
-def send_summary_report(critical_certs: list):
+def send_summary_report(events: list) -> tuple[bool, str | None]:
     """Envoie un rapport récapitulatif par email avec les certificats critiques."""
     # Lit la configuration depuis les variables d'environnement chargées par Docker Compose
     sender_email = os.getenv("SMTP_SENDER_EMAIL")
@@ -167,12 +169,13 @@ def send_summary_report(critical_certs: list):
 
     if not all([sender_email, password, recipients_str, smtp_server]):
         print("-> AVERTISSEMENT: Variables d'environnement pour l'email non configurées. Envoi annulé.")
-        return
+        return False, "Configuration SMTP incomplète."
 
     recipients = [email.strip() for email in recipients_str.split(',')]
     
     msg = EmailMessage()
-    msg['Subject'] = f"🚨 Rapport SSL-Cert-Monitor : {len(critical_certs)} certificat(s) requièrent votre attention"
+    has_resolution = any(event.event_type == "resolved" for event in events)
+    msg['Subject'] = f"{'✅ Résolution' if has_resolution else '🚨 Alerte'} SSL-Cert-Monitor : {len(events)} événement(s)"
     msg['From'] = sender_email
     msg['To'] = ", ".join(recipients)
 
@@ -181,9 +184,11 @@ def send_summary_report(critical_certs: list):
         "\nLe rapport de surveillance quotidien a identifié les certificats suivants comme étant critiques :",
         "\n"
     ]
-    for cert in critical_certs:
+    for event in events:
+        cert = event.certificate
         body_lines.append("----------------------------------------")
         body_lines.append(f"Domaine : {cert['domain']}")
+        body_lines.append(f"Événement : {event.event_type}")
         body_lines.append(f"Statut  : {cert['status']}")
         if cert.get('days_left') is not None:
              body_lines.append(f"Jours restants : {cert['days_left']}")
@@ -199,9 +204,11 @@ def send_summary_report(critical_certs: list):
             server.starttls()
             server.login(sender_email, password)
             server.send_message(msg)
-        print("-> ✅ Rapport email envoyé avec succès.")
+        print("-> ✅ Notification email envoyée avec succès.")
+        return True, None
     except Exception as e:
         print(f"-> ❌ Échec de l'envoi de l'email : {e}")
+        return False, str(e)
 
 # --- Logique de vérification SSL Asynchrone ---
 # --- Fonction Principale du Script ---
@@ -230,11 +237,14 @@ async def main():
     print(f"-> Vérification terminée. {len(results)} domaines traités. Rapport mis à jour en base.")
 
     # Filtrage des certificats critiques et envoi de l'email
-    critical_certs = [cert for cert in results if cert['status'] in ['Expire bientôt', 'Expiré', 'Erreur']]
-    if critical_certs:
-        send_summary_report(critical_certs)
+    with SessionLocal() as session:
+        events = select_alert_events(session, results)
+    if events:
+        success, error = send_summary_report(events)
+        with SessionLocal() as session:
+            record_notification(session, events, success, error)
     else:
-        print("-> Tous les certificats sont OK. Aucun email envoyé.")
+        print("-> Aucun nouvel événement d'alerte. Aucun email envoyé.")
 
 if __name__ == "__main__":
     asyncio.run(main())
