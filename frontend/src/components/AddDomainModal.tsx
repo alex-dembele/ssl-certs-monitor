@@ -4,11 +4,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { Certificate } from './DashboardDisplay';
-
-const API_URL = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_API_URL 
-  ? process.env.NEXT_PUBLIC_API_URL 
-  : (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8000` : "http://localhost:8000");
+import { API_BASE_URL } from '@/lib/api';
 
 // La prop attend bien un tableau de string[]
 interface AddDomainModalProps {
@@ -34,7 +30,7 @@ export default function AddDomainModal({ isOpen, onClose, onDomainsAdded }: AddD
     const toastId = toast.loading("Ajout des domaines à la liste...");
 
     try {
-      const response = await fetch(`${API_URL}/api/domains/bulk`, {
+      const response = await fetch(`${API_BASE_URL}/api/domains/bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domains: domains }),
