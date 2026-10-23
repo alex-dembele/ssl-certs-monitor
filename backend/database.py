@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, create_engine, select, text
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, create_engine, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Session, relationship, sessionmaker
 
 
@@ -35,8 +35,16 @@ class CertificateStatus(Base):
     status = Column(String(32), nullable=False)
     days_left = Column(Integer, nullable=True)
     expiry_date = Column(String(64), nullable=True)
+    valid_from = Column(String(64), nullable=True)
+    valid_until = Column(String(64), nullable=True)
+    issuer = Column(Text, nullable=True)
+    subject = Column(Text, nullable=True)
+    serial_number = Column(String(128), nullable=True)
+    fingerprint = Column(String(128), nullable=True)
+    san = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
-    checked_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    error_type = Column(String(64), nullable=True)
+    checked_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     domain = relationship("Domain", back_populates="status")
 
 
@@ -48,6 +56,7 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 def initialize_database() -> None:
     Base.metadata.create_all(engine)
+    _upgrade_status_schema()
     if not LEGACY_DOMAINS_FILE:
         return
 
@@ -68,6 +77,27 @@ def initialize_database() -> None:
                     text("INSERT INTO domains (name) VALUES (:name) ON CONFLICT (name) DO NOTHING"),
                     {"name": domain.strip()},
                 )
+
+
+def _upgrade_status_schema() -> None:
+    """Add fields introduced after the initial JSON-to-database migration."""
+    columns = {
+        "valid_from": "VARCHAR(64)",
+        "valid_until": "VARCHAR(64)",
+        "issuer": "TEXT",
+        "subject": "TEXT",
+        "serial_number": "VARCHAR(128)",
+        "fingerprint": "VARCHAR(128)",
+        "san": "TEXT",
+        "error_type": "VARCHAR(64)",
+    }
+    existing = {column["name"] for column in inspect(engine).get_columns("certificate_statuses")}
+    missing = columns.keys() - existing
+    if not missing:
+        return
+    with engine.begin() as connection:
+        for name in missing:
+            connection.execute(text(f"ALTER TABLE certificate_statuses ADD COLUMN {name} {columns[name]}"))
 
 
 def list_domains(session: Session) -> list[str]:
@@ -100,7 +130,16 @@ def list_statuses(session: Session) -> list[dict]:
             "status": status.status,
             "days_left": status.days_left,
             "expiry_date": status.expiry_date,
+            "valid_from": status.valid_from,
+            "valid_until": status.valid_until,
+            "issuer": status.issuer,
+            "subject": status.subject,
+            "serial_number": status.serial_number,
+            "fingerprint": status.fingerprint,
+            "san": json.loads(status.san) if status.san else [],
             "error_message": status.error_message,
+            "error_type": status.error_type,
+            "checked_at": status.checked_at.isoformat() if status.checked_at else None,
         }
         for status in statuses
     ]
@@ -111,14 +150,24 @@ def save_statuses(session: Session, statuses: Iterable[dict]) -> None:
         session.execute(
             text(
                 """INSERT INTO certificate_statuses
-                (domain_name, status, days_left, expiry_date, error_message, checked_at)
-                SELECT name, :status, :days_left, :expiry_date, :error_message, :checked_at
+                (domain_name, status, days_left, expiry_date, valid_from, valid_until,
+                 issuer, subject, serial_number, fingerprint, san, error_message, error_type, checked_at)
+                SELECT name, :status, :days_left, :expiry_date, :valid_from, :valid_until,
+                 :issuer, :subject, :serial_number, :fingerprint, :san, :error_message, :error_type, :checked_at
                 FROM domains WHERE name = :domain_name
                 ON CONFLICT (domain_name) DO UPDATE SET
                     status = excluded.status,
                     days_left = excluded.days_left,
                     expiry_date = excluded.expiry_date,
+                    valid_from = excluded.valid_from,
+                    valid_until = excluded.valid_until,
+                    issuer = excluded.issuer,
+                    subject = excluded.subject,
+                    serial_number = excluded.serial_number,
+                    fingerprint = excluded.fingerprint,
+                    san = excluded.san,
                     error_message = excluded.error_message,
+                    error_type = excluded.error_type,
                     checked_at = excluded.checked_at"""
             ),
             {
@@ -126,8 +175,25 @@ def save_statuses(session: Session, statuses: Iterable[dict]) -> None:
                 "status": certificate["status"],
                 "days_left": certificate.get("days_left"),
                 "expiry_date": certificate.get("expiry_date"),
+                "valid_from": certificate.get("valid_from"),
+                "valid_until": certificate.get("valid_until"),
+                "issuer": certificate.get("issuer"),
+                "subject": certificate.get("subject"),
+                "serial_number": certificate.get("serial_number"),
+                "fingerprint": certificate.get("fingerprint"),
+                "san": json.dumps(certificate.get("san", [])),
                 "error_message": certificate.get("error_message"),
-                "checked_at": datetime.utcnow(),
+                "error_type": certificate.get("error_type"),
+                "checked_at": _checked_at(certificate.get("checked_at")),
             },
         )
     session.commit()
+
+
+def _checked_at(value: str | None) -> datetime:
+    if value:
+        try:
+            return datetime.fromisoformat(value).replace(tzinfo=None)
+        except ValueError:
+            pass
+    return datetime.now(timezone.utc).replace(tzinfo=None)
