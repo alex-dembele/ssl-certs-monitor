@@ -43,7 +43,15 @@ export default function CertificateDetailModal({ cert, onClose }: DetailModalPro
             <div className="p-6">
               <DetailRow label="Statut" value={cert.status} />
               <DetailRow label="Jours Restants" value={cert.days_left?.toString()} />
+              <DetailRow label="Contrôlé le" value={cert.checked_at ? new Date(cert.checked_at).toLocaleString('fr-FR') : undefined} />
               <DetailRow label="Date d'Expiration" value={cert.expiry_date ? new Date(cert.expiry_date).toLocaleString('fr-FR') : 'N/A'} />
+              <DetailRow label="Valide depuis" value={cert.valid_from ? new Date(cert.valid_from).toLocaleString('fr-FR') : undefined} />
+              <DetailRow label="Émetteur" value={cert.issuer} />
+              <DetailRow label="Sujet" value={cert.subject} />
+              <DetailRow label="Numéro de série" value={cert.serial_number} />
+              <DetailRow label="Empreinte SHA-256" value={cert.fingerprint} />
+              <DetailRow label="SAN" value={cert.san?.join(', ')} />
+              {cert.error_type && <DetailRow label="Type d'Erreur" value={cert.error_type} />}
               {cert.error_message && <DetailRow label="Message d'Erreur" value={cert.error_message} />}
             </div>
           </motion.div>
