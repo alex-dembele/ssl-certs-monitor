@@ -40,6 +40,9 @@ class NotificationLog(Base):
     channel = Column(String(32), nullable=False)
     success = Column(Boolean, nullable=False)
     error_message = Column(Text, nullable=True)
+    idempotency_key = Column(String(64), nullable=True, unique=True)
+    delivery_status = Column(String(16), nullable=False, default="delivered")
+    attempts = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
@@ -80,13 +83,18 @@ def select_alert_events(session: Session, results: Iterable[dict], now: datetime
     return events
 
 
-def record_notification(session: Session, events: Iterable[AlertEvent], success: bool, error_message: str | None = None, now: datetime | None = None) -> None:
+def record_notification(session: Session, events: Iterable[AlertEvent], success: bool, error_message: str | None = None, now: datetime | None = None, delivery_status: str = "delivered", attempts: int = 1, idempotency_key: str | None = None) -> None:
     now = now or datetime.utcnow()
     for event in events:
-        session.add(NotificationLog(
-            domain_name=event.domain, event_type=event.event_type, channel=event.channel,
-            success=success, error_message=error_message, created_at=now,
-        ))
+        log = session.query(NotificationLog).filter_by(idempotency_key=idempotency_key).first() if idempotency_key else None
+        if log is None:
+            log = NotificationLog(domain_name=event.domain, event_type=event.event_type, channel=event.channel, idempotency_key=idempotency_key)
+            session.add(log)
+        log.success = success
+        log.error_message = error_message
+        log.created_at = now
+        log.delivery_status = delivery_status
+        log.attempts = attempts
         if success:
             state = session.get(AlertState, event.domain)
             if state is None:

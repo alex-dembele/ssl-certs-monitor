@@ -33,7 +33,7 @@ class AlertPolicyUpdate(BaseModel):
     threshold_days: int = Field(default=30, ge=1, le=3650)
     reminder_interval_hours: int = Field(default=168, ge=0, le=8760)
     enabled: bool = True
-    channel: str = Field(default="email", pattern="^email$")
+    channel: str = Field(default="email", pattern="^(email|webhook|slack|teams|discord)$")
 
 initialize_database()
 
