@@ -120,9 +120,14 @@ export default function DashboardDisplay() {
     }, []);
 
     useEffect(() => {
-        fetchInitialData();
+        const initialLoad = setTimeout(() => {
+            void fetchInitialData();
+        }, 0);
         const interval = setInterval(fetchInitialData, 5 * 60 * 1000);
-        return () => clearInterval(interval);
+        return () => {
+            clearTimeout(initialLoad);
+            clearInterval(interval);
+        };
     }, [fetchInitialData]);
 
     const handleDomainsAdded = (newDomains: string[]) => {
