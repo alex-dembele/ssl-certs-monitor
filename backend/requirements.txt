@@ -3,3 +3,5 @@ uvicorn[standard]==0.24.0
 pydantic==2.5.0
 cryptography==41.0.7
 python-dotenv==1.0.0
+SQLAlchemy==2.0.36
+psycopg[binary]==3.2.13

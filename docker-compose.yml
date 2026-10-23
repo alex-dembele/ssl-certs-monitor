@@ -28,13 +28,32 @@ services:
       - BACKEND_API_TOKEN=${BACKEND_API_TOKEN:-}
       - APP_ENV=${APP_ENV:-development}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - DATABASE_URL=postgresql+psycopg://monitor:${POSTGRES_PASSWORD:-monitor}@db:5432/ssl_monitor
+      - LEGACY_DOMAINS_FILE=/app/domains.json
     dns: [ "8.8.8.8", "1.1.1.1" ]
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ssl_monitor
+      POSTGRES_USER: monitor
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-monitor}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U monitor -d ssl_monitor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend-cron:
     build: ./backend
@@ -45,12 +64,18 @@ services:
     dns: [ "8.8.8.8", "1.1.1.1" ]
     restart: unless-stopped
     depends_on:
-      - backend-api
+      backend-api:
+        condition: service_started
+      db:
+        condition: service_healthy
     environment:
       - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql+psycopg://monitor:${POSTGRES_PASSWORD:-monitor}@db:5432/ssl_monitor
+      - LEGACY_DOMAINS_FILE=/app/domains.json
     command: >
       sh -c "while true; do python cron_job.py; sleep 86400; done"
 
 volumes:
   api_data:
   status_data:
+  postgres_data:
