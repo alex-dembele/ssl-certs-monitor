@@ -115,9 +115,14 @@ export default function DashboardDisplay() {
     }, [isLoading]);
 
     useEffect(() => {
-        fetchInitialData();
+        const initialLoad = setTimeout(() => {
+            void fetchInitialData();
+        }, 0);
         const interval = setInterval(fetchInitialData, 5 * 60 * 1000);
-        return () => clearInterval(interval);
+        return () => {
+            clearTimeout(initialLoad);
+            clearInterval(interval);
+        };
     }, [fetchInitialData]);
 
     const handleDomainsAdded = (newDomains: string[]) => {
@@ -135,7 +140,7 @@ export default function DashboardDisplay() {
                 setCertificates(prevCerts => 
                     prevCerts.map(cert => cert.domain === domain ? checkedCert : cert)
                 );
-            } catch (e) {
+            } catch {
                 setCertificates(prevCerts => 
                     prevCerts.map(cert => cert.domain === domain ? { ...cert, status: 'Erreur', error_message: 'Échec de la vérification' } : cert)
                 );

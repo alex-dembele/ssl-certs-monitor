@@ -4,7 +4,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { Certificate } from './DashboardDisplay';
 
 const API_URL = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_API_URL 
   ? process.env.NEXT_PUBLIC_API_URL 
