@@ -124,19 +124,16 @@ git push origin develop  # ✅ Déjà fait
 
 ---
 
-## Configuration d'une base de données gratuite (optionnel)
+## Configuration de la base de données
 
-Pour persister les données:
+L'API utilise PostgreSQL pour persister les domaines et les derniers statuts. Configurez `DATABASE_URL` sur le backend. Au premier démarrage, `LEGACY_DOMAINS_FILE` peut pointer vers l'ancien `domains.json` pour importer les domaines existants.
 
 ### Supabase PostgreSQL (Gratuit)
 - 500MB storage
 - Connexion à partir du backend
 - Très simple à intégrer
 
-### MongoDB Atlas (Gratuit)
-- 512MB storage
-- Parfait pour JSON
-- Très facile à mettre en place
+Les fournisseurs PostgreSQL compatibles peuvent être utilisés de la même manière.
 
 ---
 

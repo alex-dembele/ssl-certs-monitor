@@ -151,6 +151,8 @@ API_URL=http://localhost:8000
 BACKEND_API_TOKEN=change-this-in-production
 CORS_ORIGINS=http://localhost:3000
 APP_ENV=development
+DATABASE_URL=postgresql+psycopg://monitor:mot-de-passe@localhost:5432/ssl_monitor
+LEGACY_DOMAINS_FILE=domains.json
 
 # Frontend
 BACKEND_API_URL=http://localhost:8000
@@ -165,6 +167,8 @@ ALERT_RECIPIENTS=recipient@example.com
 ```
 
 `BACKEND_API_TOKEN` protège les routes `/api/*` lorsqu'il est défini. Il doit être identique sur le backend et le frontend, et obligatoire avec `APP_ENV=production`. Le frontend transmet ce token côté serveur via le proxy Next.js ; il n'est pas exposé au navigateur. `CORS_ORIGINS` accepte une liste d'origines séparées par des virgules.
+
+Les domaines et les derniers statuts sont stockés dans PostgreSQL via `DATABASE_URL`. Au premier démarrage, `LEGACY_DOMAINS_FILE` permet d'importer les domaines de l'ancien fichier JSON ; cette migration est idempotente. Avec Docker Compose, PostgreSQL et le volume persistant sont configurés automatiquement.
 
 ### API Endpoints
 
