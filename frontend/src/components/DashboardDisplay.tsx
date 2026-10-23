@@ -125,8 +125,20 @@ export default function DashboardDisplay() {
   }), [certificates, filter, query, sortAscending]);
 
   const handleDomainsAdded = (domains: string[]) => {
-    setCertificates((current) => [...current, ...domains.map((domain) => ({ domain, status: "Vérification..." as const }))]);
-    void loadData();
+    setCertificates((current) => {
+      const existing = new Set(current.map((certificate) => certificate.domain));
+      return [...current, ...domains.filter((domain) => !existing.has(domain)).map((domain) => ({ domain, status: "Vérification..." as const }))];
+    });
+    void Promise.all(domains.map(async (domain) => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/check/${encodeURIComponent(domain)}`);
+        if (!response.ok) throw new Error("Certificate check failed");
+        const certificate: Certificate = await response.json();
+        setCertificates((current) => current.map((item) => item.domain === domain ? certificate : item));
+      } catch {
+        setCertificates((current) => current.map((item) => item.domain === domain ? { ...item, status: "Erreur", error_message: "Certificate check failed" } : item));
+      }
+    }));
   };
 
   const handleDelete = async (domain: string) => {

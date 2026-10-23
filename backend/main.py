@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List
-from database import Domain, SessionLocal, add_domains, delete_domain as remove_domain, initialize_database, list_domains, list_statuses
+from database import Domain, SessionLocal, add_domains, delete_domain as remove_domain, initialize_database, list_domains, list_statuses, save_statuses
 from alerts import AlertEvent, AlertPolicy, get_policy
 from settings import DEFAULTS, SettingsAuditLog, get_settings, settings_to_dict
 from notifications import deliver_events
@@ -80,7 +80,11 @@ async def add_bulk_domains(domain_list: DomainList):
 
 @app.get("/api/check/{domain_name}", dependencies=[Depends(require_api_auth)])
 async def check_single_domain(domain_name: str):
-    return await get_ssl_expiry_info(domain_name)
+    result = await get_ssl_expiry_info(domain_name)
+    with SessionLocal() as session:
+        if session.get(Domain, domain_name):
+            save_statuses(session, [result])
+    return result
 
 @app.delete("/api/domains/{domain_name}", dependencies=[Depends(require_api_auth)])
 async def delete_domain(domain_name: str):
