@@ -1,7 +1,7 @@
 // Fichier: frontend/src/components/DashboardDisplay.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import { Toaster, toast } from 'react-hot-toast';
@@ -30,6 +30,7 @@ export interface Certificate {
 }
 type SortKey = 'days_left' | 'domain';
 type SortDirection = 'asc' | 'desc';
+type BackendStatus = 'unknown' | 'healthy' | 'unavailable';
 
 // --- Sous-Composant : Badge de Statut ---
 const StatusBadge = ({ status }: { status: Certificate['status'] }) => {
@@ -87,7 +88,11 @@ const SkeletonCard = () => (
 export default function DashboardDisplay() {
     const [certificates, setCertificates] = useState<Certificate[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [syncError, setSyncError] = useState<string | null>(null);
+    const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+    const [backendStatus, setBackendStatus] = useState<BackendStatus>('unknown');
+    const refreshInFlight = useRef(false);
     const [inputValue, setInputValue] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -96,13 +101,22 @@ export default function DashboardDisplay() {
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
     const fetchInitialData = useCallback(async () => {
-        if (!isLoading) setIsLoading(true);
+        if (refreshInFlight.current) return;
+        refreshInFlight.current = true;
+        setIsRefreshing(true);
         try {
-            const statusRes = await fetch(`${API_BASE_URL}/api/status?t=${new Date().getTime()}`).catch(() => null);
-            const domainsRes = await fetch(`${API_BASE_URL}/api/domains`).catch(() => null);
-            
-            const statuses: Certificate[] = statusRes?.ok ? await statusRes.json().catch(() => []) : [];
-            const { domains }: { domains: string[] } = domainsRes?.ok ? await domainsRes.json().catch(() => ({ domains: [] })) : { domains: [] };
+            const [statusRes, domainsRes] = await Promise.all([
+                fetch(`${API_BASE_URL}/api/status?t=${Date.now()}`),
+                fetch(`${API_BASE_URL}/api/domains`),
+            ]);
+            if (!statusRes.ok) throw new Error(`API status indisponible (${statusRes.status}).`);
+            if (!domainsRes.ok) throw new Error(`API domaines indisponible (${domainsRes.status}).`);
+            const statuses = await statusRes.json() as Certificate[];
+            const domainsPayload = await domainsRes.json() as { domains?: string[] };
+            if (!Array.isArray(statuses) || !Array.isArray(domainsPayload.domains)) {
+                throw new Error("Réponse API invalide.");
+            }
+            const domains = domainsPayload.domains;
             const statusMap = new Map(statuses.map(s => [s.domain, s]));
 
             const mergedCertificates = domains.map(domain => {
@@ -111,20 +125,21 @@ export default function DashboardDisplay() {
                 return { domain, status: 'En attente' } as Certificate;
             });
             setCertificates(mergedCertificates);
-            setError(null);
+            setSyncError(null);
+            setBackendStatus('healthy');
+            setLastSyncedAt(new Date());
         } catch (err) {
-            if (err instanceof Error) { setError(err.message); } 
-            else { setError("Une erreur de type inconnu est survenue."); }
-            setCertificates([]);
+            setSyncError(err instanceof Error ? err.message : "Erreur de synchronisation inconnue.");
+            setBackendStatus('unavailable');
         } finally {
+            refreshInFlight.current = false;
             setIsLoading(false);
+            setIsRefreshing(false);
         }
-    }, [isLoading]);
+    }, []);
 
     useEffect(() => {
-        const initialLoad = setTimeout(() => {
-            void fetchInitialData();
-        }, 0);
+        const initialLoad = window.setTimeout(() => void fetchInitialData(), 0);
         const interval = setInterval(fetchInitialData, 5 * 60 * 1000);
         return () => {
             clearTimeout(initialLoad);
@@ -201,6 +216,17 @@ export default function DashboardDisplay() {
                     <p className="text-slate-400 mt-2">Votre tour de contrôle pour les certificats SSL/TLS</p>
                 </header>
 
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm">
+                    <div className="flex items-center gap-2 text-slate-300">
+                        <span className={`h-2.5 w-2.5 rounded-full ${backendStatus === 'healthy' ? 'bg-emerald-400' : backendStatus === 'unavailable' ? 'bg-red-400' : 'bg-slate-500'}`} />
+                        <span>Backend : {backendStatus === 'healthy' ? 'opérationnel' : backendStatus === 'unavailable' ? 'indisponible' : 'inconnu'}</span>
+                        {lastSyncedAt && <span className="text-slate-500">· Dernière synchronisation : {lastSyncedAt.toLocaleString('fr-FR')}</span>}
+                    </div>
+                    <button onClick={() => void fetchInitialData()} disabled={isRefreshing} className="rounded-md bg-slate-700 px-3 py-2 text-slate-200 hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50">
+                        {isRefreshing ? 'Synchronisation...' : 'Actualiser'}
+                    </button>
+                </div>
+
                 <div className="mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
                      <div className="flex items-center gap-2 w-full md:w-auto flex-grow">
                         <input type="text" placeholder="Rechercher un domaine..." value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }} className="w-full max-w-lg pl-4 pr-10 py-3 bg-slate-900/50 backdrop-blur-md border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
@@ -218,9 +244,9 @@ export default function DashboardDisplay() {
                     <Link href="/settings" className="px-5 py-3 bg-slate-700 hover:bg-slate-600 font-semibold rounded-lg transition-colors whitespace-nowrap">Paramètres</Link>
                 </div>
 
-                {error && <div className="text-center py-10 bg-red-900/50 rounded-lg text-red-300">{error}</div>}
+                {syncError && <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-800 bg-red-950/50 p-4 text-red-200"><span>Synchronisation impossible : {syncError} {certificates.length > 0 && 'Les dernières données sont conservées.'}</span><button onClick={() => void fetchInitialData()} className="rounded-md bg-red-900 px-3 py-2 hover:bg-red-800">Réessayer</button></div>}
 
-                {!error && ( isLoading ? (
+                {isLoading && certificates.length === 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
                         </div>
@@ -234,8 +260,7 @@ export default function DashboardDisplay() {
                                 ) : ( <div className="col-span-full text-center py-10"><p className="text-slate-400">Aucun domaine à surveiller. Ajoutez-en un pour commencer !</p></div> )}
                             </AnimatePresence>
                         </motion.div>
-                    )
-                )}
+                    )}
             </div>
         </div>
     );
