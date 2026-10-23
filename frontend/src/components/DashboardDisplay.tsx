@@ -1,7 +1,7 @@
 // Fichier: frontend/src/components/DashboardDisplay.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import { Toaster, toast } from 'react-hot-toast';
 
@@ -84,9 +84,13 @@ export default function DashboardDisplay() {
     const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
     const [sortKey, setSortKey] = useState<SortKey>('days_left');
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+    const isRefreshingRef = useRef(false);
 
     const fetchInitialData = useCallback(async () => {
-        if (!isLoading) setIsLoading(true);
+        if (isRefreshingRef.current) return;
+
+        isRefreshingRef.current = true;
+        setIsLoading(true);
         try {
             const statusRes = await fetch(`${API_BASE_URL}/api/status?t=${new Date().getTime()}`).catch(() => null);
             const domainsRes = await fetch(`${API_BASE_URL}/api/domains`).catch(() => null);
@@ -107,9 +111,10 @@ export default function DashboardDisplay() {
             else { setError("Une erreur de type inconnu est survenue."); }
             setCertificates([]);
         } finally {
+            isRefreshingRef.current = false;
             setIsLoading(false);
         }
-    }, [isLoading]);
+    }, []);
 
     useEffect(() => {
         const initialLoad = setTimeout(() => {
