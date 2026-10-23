@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence, Variants } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 import { Toaster, toast } from 'react-hot-toast';
 
 import ExpirationGauge from "./ExpirationGauge";
@@ -31,6 +31,7 @@ export interface Certificate {
 type SortKey = 'days_left' | 'domain';
 type SortDirection = 'asc' | 'desc';
 type BackendStatus = 'unknown' | 'healthy' | 'unavailable';
+type StatusFilter = Certificate['status'] | 'all';
 
 // --- Sous-Composant : Badge de Statut ---
 const StatusBadge = ({ status }: { status: Certificate['status'] }) => {
@@ -46,7 +47,6 @@ const StatusBadge = ({ status }: { status: Certificate['status'] }) => {
 };
 
 // --- Variantes d'animation ---
-const containerVariants: Variants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08 } } };
 const itemVariants: Variants = { hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 100 } } };
 
 // --- Sous-Composant : Carte Certificat ---
@@ -99,6 +99,10 @@ export default function DashboardDisplay() {
     const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
     const [sortKey, setSortKey] = useState<SortKey>('days_left');
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+    const [page, setPage] = useState(1);
+    const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+    const pageSize = 25;
 
     const fetchInitialData = useCallback(async () => {
         if (refreshInFlight.current) return;
@@ -189,11 +193,23 @@ export default function DashboardDisplay() {
         }
     };
 
-    const handleSearch = () => setSearchTerm(inputValue);
+    const handleSearch = () => {
+        setSearchTerm(inputValue);
+        setPage(1);
+    };
 
-    const processedCertificates = useMemo(() => {
+    const summary = useMemo(() => ({
+        total: certificates.length,
+        healthy: certificates.filter(cert => cert.status === 'OK').length,
+        expiring: certificates.filter(cert => cert.status === 'Expire bientôt').length,
+        expired: certificates.filter(cert => cert.status === 'Expiré').length,
+        errors: certificates.filter(cert => cert.status === 'Erreur').length,
+    }), [certificates]);
+
+    const filteredCertificates = useMemo(() => {
         return certificates
             .filter(cert => cert.domain.toLowerCase().includes(searchTerm.toLowerCase()))
+            .filter(cert => statusFilter === 'all' || cert.status === statusFilter)
             .sort((a, b) => {
                 const aDays = a.days_left ?? (sortDirection === 'asc' ? Infinity : -Infinity);
                 const bDays = b.days_left ?? (sortDirection === 'asc' ? Infinity : -Infinity);
@@ -203,7 +219,11 @@ export default function DashboardDisplay() {
                     return sortDirection === 'asc' ? a.domain.localeCompare(b.domain) : b.domain.localeCompare(a.domain);
                 }
             });
-    }, [certificates, searchTerm, sortKey, sortDirection]);
+    }, [certificates, searchTerm, statusFilter, sortKey, sortDirection]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredCertificates.length / pageSize));
+    const currentPage = Math.min(page, totalPages);
+    const visibleCertificates = filteredCertificates.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
     return (
         <div className="min-h-screen p-4 md:p-8 bg-slate-950 text-white">
@@ -227,7 +247,23 @@ export default function DashboardDisplay() {
                     </button>
                 </div>
 
-                <div className="mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                <nav aria-label="Navigation du dashboard" className="mb-6 flex flex-wrap gap-2 text-sm">
+                    <a href="#domains" className="rounded-md bg-blue-600 px-3 py-2 text-white">Domaines</a>
+                    <a href="#alerts" className="rounded-md bg-slate-800 px-3 py-2 text-slate-300 hover:bg-slate-700">Alertes</a>
+                    <a href="#history" className="rounded-md bg-slate-800 px-3 py-2 text-slate-300 hover:bg-slate-700">Historique</a>
+                    <Link href="/settings" className="rounded-md bg-slate-800 px-3 py-2 text-slate-300 hover:bg-slate-700">Paramètres</Link>
+                </nav>
+
+                <section id="alerts" aria-label="Synthèse des alertes" className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-5">
+                    {[['Total', summary.total, 'text-slate-200'], ['Sains', summary.healthy, 'text-emerald-400'], ['Bientôt expirés', summary.expiring, 'text-yellow-400'], ['Expirés', summary.expired, 'text-red-400'], ['Erreurs', summary.errors, 'text-red-300']].map(([label, value, color]) => (
+                        <div key={label as string} className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+                            <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+                            <p className={`mt-2 text-3xl font-bold ${color}`}>{value}</p>
+                        </div>
+                    ))}
+                </section>
+
+                <div id="domains" className="mb-4 flex flex-col md:flex-row justify-between items-center gap-4">
                      <div className="flex items-center gap-2 w-full md:w-auto flex-grow">
                         <input type="text" placeholder="Rechercher un domaine..." value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }} className="w-full max-w-lg pl-4 pr-10 py-3 bg-slate-900/50 backdrop-blur-md border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
                         <button onClick={handleSearch} className="px-5 py-3 bg-blue-600 hover:bg-blue-700 font-semibold rounded-lg transition-colors active:scale-95">Rechercher</button>
@@ -240,6 +276,15 @@ export default function DashboardDisplay() {
                             {sortDirection === 'asc' ? '↑' : '↓'}
                         </button>
                     </div>
+                    <label className="flex items-center gap-2 text-sm text-slate-300">Statut
+                        <select value={statusFilter} onChange={event => { setStatusFilter(event.target.value as StatusFilter); setPage(1); }} className="rounded-md bg-slate-800 px-3 py-2" aria-label="Filtrer par statut">
+                            <option value="all">Tous</option><option value="OK">Sains</option><option value="Expire bientôt">Bientôt expirés</option><option value="Expiré">Expirés</option><option value="Erreur">Erreurs</option>
+                        </select>
+                    </label>
+                    <div className="flex gap-1 rounded-md bg-slate-800 p-1" aria-label="Mode d'affichage">
+                        <button onClick={() => setViewMode('table')} className={`rounded px-2 py-1 text-xs ${viewMode === 'table' ? 'bg-blue-600' : 'text-slate-400'}`}>Table</button>
+                        <button onClick={() => setViewMode('cards')} className={`rounded px-2 py-1 text-xs ${viewMode === 'cards' ? 'bg-blue-600' : 'text-slate-400'}`}>Cartes</button>
+                    </div>
                     <button onClick={() => setIsAddModalOpen(true)} className="px-5 py-3 bg-green-600 hover:bg-green-700 font-semibold rounded-lg transition-colors active:scale-95 whitespace-nowrap">Ajouter Domaines</button>
                     <Link href="/settings" className="px-5 py-3 bg-slate-700 hover:bg-slate-600 font-semibold rounded-lg transition-colors whitespace-nowrap">Paramètres</Link>
                 </div>
@@ -250,17 +295,24 @@ export default function DashboardDisplay() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
                         </div>
-                    ) : (
-                        <motion.div variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <AnimatePresence>
-                                {processedCertificates.length > 0 ? (
-                                    processedCertificates.map((cert) => ( 
-                                        <CertificateCard key={cert.domain} cert={cert} onCardClick={() => setSelectedCert(cert)} onDeleteClick={handleDelete} /> 
-                                    ))
-                                ) : ( <div className="col-span-full text-center py-10"><p className="text-slate-400">Aucun domaine à surveiller. Ajoutez-en un pour commencer !</p></div> )}
-                            </AnimatePresence>
+                    ) : viewMode === 'cards' ? (
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {visibleCertificates.map(cert => <CertificateCard key={cert.domain} cert={cert} onCardClick={() => setSelectedCert(cert)} onDeleteClick={handleDelete} />)}
                         </motion.div>
+                    ) : (
+                        <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/70">
+                            <table className="w-full min-w-[720px] text-left text-sm" aria-label="Domaines surveillés">
+                                <thead className="border-b border-slate-800 text-xs uppercase tracking-wide text-slate-500"><tr><th scope="col" className="px-4 py-3">Domaine</th><th scope="col" className="px-4 py-3">Statut</th><th scope="col" className="px-4 py-3">Jours</th><th scope="col" className="px-4 py-3">Prochaine échéance</th><th scope="col" className="px-4 py-3">Dernière vérification</th><th scope="col" className="px-4 py-3">Action</th></tr></thead>
+                                <tbody className="divide-y divide-slate-800">
+                                    {visibleCertificates.map(cert => <tr key={cert.domain} tabIndex={0} onClick={() => setSelectedCert(cert)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedCert(cert); } }} className="cursor-pointer outline-none hover:bg-slate-800/60 focus:bg-slate-800/60">
+                                        <th scope="row" className="px-4 py-4 font-medium text-slate-200">{cert.domain}</th><td className="px-4 py-4"><StatusBadge status={cert.status} /></td><td className="px-4 py-4 text-slate-300">{cert.days_left ?? '—'}</td><td className="px-4 py-4 text-slate-400">{cert.expiry_date ? new Date(cert.expiry_date).toLocaleDateString('fr-FR') : '—'}</td><td className="px-4 py-4 text-slate-400">{cert.checked_at ? new Date(cert.checked_at).toLocaleString('fr-FR') : '—'}</td><td className="px-4 py-4"><button onClick={event => { event.stopPropagation(); void handleDelete(cert.domain); }} className="rounded-md px-2 py-1 text-red-300 hover:bg-red-950/60 focus:outline-none focus:ring-2 focus:ring-red-400" aria-label={`Supprimer ${cert.domain}`}>Supprimer</button></td>
+                                    </tr>)}
+                                </tbody>
+                            </table>
+                            {visibleCertificates.length === 0 && <p className="p-8 text-center text-slate-400">Aucun domaine correspondant.</p>}
+                        </div>
                     )}
+                {!isLoading && <div id="history" className="mt-4 flex items-center justify-between text-sm text-slate-400"><span>{filteredCertificates.length} domaine(s) · page {currentPage} / {totalPages}</span><div className="flex gap-2"><button onClick={() => setPage(currentPage - 1)} disabled={currentPage === 1} className="rounded-md bg-slate-800 px-3 py-2 disabled:opacity-40">Précédent</button><button onClick={() => setPage(currentPage + 1)} disabled={currentPage === totalPages} className="rounded-md bg-slate-800 px-3 py-2 disabled:opacity-40">Suivant</button></div></div>}
             </div>
         </div>
     );
