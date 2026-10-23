@@ -2,7 +2,7 @@
 import json
 import re
 import os
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
@@ -10,14 +10,30 @@ from typing import List
 from cron_job import get_ssl_expiry_info
 
 app = FastAPI()
+backend_api_token = os.getenv("BACKEND_API_TOKEN")
+if os.getenv("APP_ENV", "development") == "production" and not backend_api_token:
+    raise RuntimeError("BACKEND_API_TOKEN must be configured in production")
+
+allowed_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 DOMAINS_FILE = "domains.json"
 STATUS_FILE = "/app/data/ssl_status.json"
 class DomainList(BaseModel): domains: List[str]
+
+async def require_api_auth(authorization: str | None = Header(default=None)):
+    if backend_api_token and authorization != f"Bearer {backend_api_token}":
+        raise HTTPException(status_code=401, detail="Authentification requise.")
 
 def read_domains() -> List[str]:
     try:
@@ -28,11 +44,11 @@ def read_domains() -> List[str]:
 def write_domains(domains: List[str]):
     with open(DOMAINS_FILE, "w") as f: json.dump(sorted(list(set(domains))), f, indent=2)
 
-@app.get("/api/domains")
+@app.get("/api/domains", dependencies=[Depends(require_api_auth)])
 async def get_domains():
     return {"domains": read_domains()}
 
-@app.get("/api/status")
+@app.get("/api/status", dependencies=[Depends(require_api_auth)])
 async def get_status():
     try:
         if os.path.exists(STATUS_FILE):
@@ -43,7 +59,7 @@ async def get_status():
     except Exception:
         return []
 
-@app.post("/api/domains/bulk")
+@app.post("/api/domains/bulk", dependencies=[Depends(require_api_auth)])
 async def add_bulk_domains(domain_list: DomainList):
     current_domains = read_domains()
     domain_regex = re.compile(r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
@@ -54,11 +70,11 @@ async def add_bulk_domains(domain_list: DomainList):
     write_domains(current_domains + list(valid_new_domains))
     return {"message": f"{len(valid_new_domains)} domaine(s) ajouté(s) à la liste de surveillance."}
 
-@app.get("/api/check/{domain_name}")
+@app.get("/api/check/{domain_name}", dependencies=[Depends(require_api_auth)])
 async def check_single_domain(domain_name: str):
     return await get_ssl_expiry_info(domain_name)
 
-@app.delete("/api/domains/{domain_name}")
+@app.delete("/api/domains/{domain_name}", dependencies=[Depends(require_api_auth)])
 async def delete_domain(domain_name: str):
     domains = read_domains()
     if domain_name not in domains:

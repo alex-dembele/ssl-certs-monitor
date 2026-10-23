@@ -148,9 +148,13 @@ Copy `.env.example` to `.env` and configure:
 ```env
 # Backend API Configuration
 API_URL=http://localhost:8000
+BACKEND_API_TOKEN=change-this-in-production
+CORS_ORIGINS=http://localhost:3000
+APP_ENV=development
 
 # Frontend
 BACKEND_API_URL=http://localhost:8000
+BACKEND_API_TOKEN=change-this-in-production
 
 # Email Alerts (Optional)
 SMTP_SERVER=smtp.gmail.com
@@ -159,6 +163,8 @@ SMTP_SENDER_EMAIL=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
 ALERT_RECIPIENTS=recipient@example.com
 ```
+
+`BACKEND_API_TOKEN` protège les routes `/api/*` lorsqu'il est défini. Il doit être identique sur le backend et le frontend, et obligatoire avec `APP_ENV=production`. Le frontend transmet ce token côté serveur via le proxy Next.js ; il n'est pas exposé au navigateur. `CORS_ORIGINS` accepte une liste d'origines séparées par des virgules.
 
 ### API Endpoints
 
