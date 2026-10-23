@@ -16,6 +16,15 @@ export interface Certificate {
   status: 'OK' | 'Expire bientôt' | 'Expiré' | 'Erreur' | 'En attente' | 'Vérification...';
   days_left?: number;
   expiry_date?: string;
+  valid_from?: string;
+  valid_until?: string;
+  issuer?: string;
+  subject?: string;
+  serial_number?: string;
+  fingerprint?: string;
+  san?: string[];
+  checked_at?: string;
+  error_type?: string;
   error_message?: string;
 }
 type SortKey = 'days_left' | 'domain';
