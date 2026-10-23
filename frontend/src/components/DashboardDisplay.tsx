@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import { Toaster, toast } from 'react-hot-toast';
 
@@ -214,6 +215,7 @@ export default function DashboardDisplay() {
                         </button>
                     </div>
                     <button onClick={() => setIsAddModalOpen(true)} className="px-5 py-3 bg-green-600 hover:bg-green-700 font-semibold rounded-lg transition-colors active:scale-95 whitespace-nowrap">Ajouter Domaines</button>
+                    <Link href="/settings" className="px-5 py-3 bg-slate-700 hover:bg-slate-600 font-semibold rounded-lg transition-colors whitespace-nowrap">Paramètres</Link>
                 </div>
 
                 {error && <div className="text-center py-10 bg-red-900/50 rounded-lg text-red-300">{error}</div>}
