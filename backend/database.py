@@ -120,14 +120,15 @@ def list_domains(session: Session) -> list[str]:
     return list(session.scalars(select(Domain.name).order_by(Domain.name)))
 
 
-def add_domains(session: Session, domains: Iterable[str]) -> int:
-    added = 0
+def add_domains(session: Session, domains: Iterable[str]) -> list[str]:
+    added = []
     for domain in domains:
         result = session.execute(
             text("INSERT INTO domains (name) VALUES (:name) ON CONFLICT (name) DO NOTHING"),
             {"name": domain},
         )
-        added += result.rowcount
+        if result.rowcount == 1:
+            added.append(domain)
     session.commit()
     return added
 
