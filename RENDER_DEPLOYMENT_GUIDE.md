@@ -207,7 +207,7 @@ pip install -r requirements.txt
 
 #### Étape 4: Start Command
 ```bash
-python cron_job.py
+python scheduler.py
 ```
 
 #### Étape 5: Variables d'environnement
@@ -215,6 +215,8 @@ Ajouter les mêmes que le backend API:
 
 ```
 PYTHONUNBUFFERED=1
+DATABASE_URL=postgresql+psycopg://…   # la même base que l'API
+CHECK_INTERVAL_MINUTES=60
 SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
 SMTP_SENDER_EMAIL=votre-email@gmail.com

@@ -31,8 +31,8 @@ The application consists of a backend service for certificate checking and a fro
 ## Prerequisites
 
 - Docker and Docker Compose installed (for containerized setup).
-- Python 3.8+ (if running without Docker).
-- Node.js 14+ and Yarn or npm (for frontend development).
+- Python 3.12+ (if running without Docker).
+- Node.js 22+ and npm (for frontend development).
 - Git for cloning the repository.
 
 ## Installation
@@ -137,7 +137,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed step-by-step instructions for ea
 2. **Add Domains**: Use the interface to add domains you want to monitor (e.g., example.com).
 3. **View Status**: The dashboard displays current certificate status, expiration dates, and validity.
 4. **Configure Alerts**: Email alerts can be configured via environment variables.
-5. **Automatic Checks**: The backend cron job automatically checks certificates daily.
+5. **Automatic Checks**: The scheduler (`backend/scheduler.py`) checks every domain at the interval set in *Settings → Organization* (see below).
 
 ## Configuration
 
@@ -145,28 +145,34 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed step-by-step instructions for ea
 
 Copy `.env.example` to `.env` and configure:
 
-```env
-# Backend API Configuration
-API_URL=http://localhost:8000
-BACKEND_API_TOKEN=change-this-in-production
-CORS_ORIGINS=http://localhost:3000
-APP_ENV=development
-DATABASE_URL=postgresql+psycopg://monitor:mot-de-passe@localhost:5432/ssl_monitor
-LEGACY_DOMAINS_FILE=domains.json
+| Variable | Service | Rôle |
+|---|---|---|
+| `BACKEND_API_TOKEN` | API, frontend | Jeton qui protège `/api/*`. **Obligatoire en production**, identique des deux côtés. |
+| `APP_ENV` | API | `production` refuse de démarrer sans `BACKEND_API_TOKEN`. |
+| `CORS_ORIGINS` | API | Origines autorisées à appeler l'API directement, séparées par des virgules. |
+| `DATABASE_URL` | API, scheduler | Connexion PostgreSQL (`postgresql+psycopg://…`). SQLite local par défaut. |
+| `BACKEND_API_URL` | frontend | URL de l'API vue par le serveur Next.js, **lue à l'exécution** : la changer ne demande pas de rebuild. |
+| `CHECK_INTERVAL_MINUTES` | scheduler | Intervalle utilisé tant qu'aucun n'est enregistré dans *Paramètres → Organisation* (60 par défaut). |
+| `SSL_CHECK_MAX_CONCURRENCY`, `SSL_CHECK_*_TIMEOUT`, `SSL_CHECK_MAX_RETRIES` | API, scheduler | Limites des vérifications TLS. |
+| `SMTP_SERVER`, `SMTP_PORT`, `SMTP_SENDER_EMAIL`, `SMTP_PASSWORD` | scheduler | Envoi des alertes email. |
+| `ALERT_RECIPIENTS` | scheduler | Destinataires email utilisés si aucun n'est saisi dans *Paramètres → Organisation*. |
+| `LEGACY_DOMAINS_FILE` | API | Import unique d'une ancienne liste JSON de domaines (optionnel). |
 
-# Frontend
-BACKEND_API_URL=http://localhost:8000
-BACKEND_API_TOKEN=change-this-in-production
+`.env.example` contient une configuration de départ.
 
-# Email Alerts (Optional)
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SENDER_EMAIL=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
-ALERT_RECIPIENTS=recipient@example.com
-```
+### Planification des vérifications
 
-`BACKEND_API_TOKEN` protège les routes `/api/*` lorsqu'il est défini. Il doit être identique sur le backend et le frontend, et obligatoire avec `APP_ENV=production`. Le frontend transmet ce token côté serveur via le proxy Next.js ; il n'est pas exposé au navigateur. `CORS_ORIGINS` accepte une liste d'origines séparées par des virgules.
+`backend/scheduler.py` lance une vérification complète, puis attend l'intervalle enregistré dans *Paramètres → Organisation* (`check_interval_minutes`), à défaut `CHECK_INTERVAL_MINUTES`, à défaut 60 minutes. Il relit ce paramètre chaque minute : un intervalle raccourci s'applique sans redémarrage. Un échec de vérification n'arrête pas la boucle.
+
+Les paramètres de la portée **Organisation** sont la configuration globale des alertes planifiées : l'interrupteur *Notifications activées* les coupe toutes, le seuil et le canal s'appliquent aux domaines sans politique dédiée, et les destinataires reçoivent les emails. La portée **Personnel** ne sert qu'aux notifications de test.
+
+### Production
+
+- Définir `APP_ENV=production` et un `BACKEND_API_TOKEN` long et aléatoire sur l'API **et** le frontend.
+- Ne pas exposer l'API publiquement : le navigateur passe par le proxy `/api/*` du frontend, qui ajoute le jeton côté serveur.
+- Utiliser PostgreSQL (`DATABASE_URL`) et déployer trois services : API (`uvicorn main:app`), scheduler (`python scheduler.py`) et frontend.
+
+Le frontend transmet `BACKEND_API_TOKEN` côté serveur via son proxy `/api/*` ; le jeton n'est jamais exposé au navigateur.
 
 Les canaux de notification disponibles sont `email`, `webhook`, `slack`, `teams` et `discord`. Les webhooks utilisent `ALERT_WEBHOOK_URL`/`ALERT_WEBHOOK_SECRET`; les intégrations dédiées utilisent respectivement `SLACK_WEBHOOK_URL`/`SLACK_WEBHOOK_SECRET`, `TEAMS_WEBHOOK_URL`/`TEAMS_WEBHOOK_SECRET` et `DISCORD_WEBHOOK_URL`/`DISCORD_WEBHOOK_SECRET`. Chaque livraison porte une clé d'idempotence et une signature HMAC avec timestamp.
 
@@ -175,11 +181,11 @@ Les domaines et les derniers statuts sont stockés dans PostgreSQL via `DATABASE
 ### Vérifications locales
 
 ```bash
-cd backend
-python -m pytest tests -q
-python -m compileall -q .
+pip install -r backend/requirements-dev.txt
+python -m pytest backend/tests -q   # depuis la racine du dépôt
+python -m compileall -q backend
 
-cd ../frontend
+cd frontend
 npm ci
 npm run lint
 npm run typecheck
@@ -196,6 +202,9 @@ Ces mêmes contrôles sont exécutés automatiquement par [la CI](.github/workfl
 - `GET /api/domains/{domain_name}/alert-policy` - Read a domain alert policy
 - `PUT /api/domains/{domain_name}/alert-policy` - Configure threshold, reminders and channel
 - `GET /api/check/{domain_name}` - Check single domain certificate
+- `GET /api/settings` - Read personal and organization settings
+- `PUT /api/settings/{scope}` - Update `personal` or `organization` settings
+- `POST /api/notifications/test` - Send a test notification
 - `GET /health` - Health check endpoint
 
 ## Contributing

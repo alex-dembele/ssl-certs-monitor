@@ -119,7 +119,7 @@ git push origin develop  # ✅ Déjà fait
    - **Environment:** Docker
    - **Root Directory:** backend
    - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `python cron_job.py`
+   - **Start Command:** `python scheduler.py`
    - **Environment Variables:** (copier du fichier .env)
 
 ---
