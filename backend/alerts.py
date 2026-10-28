@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session
 
 try:
     from .database import Base
+    from .settings import GLOBAL_SCOPE, NotificationSettings, get_settings
 except ImportError:
     from database import Base
+    from settings import GLOBAL_SCOPE, NotificationSettings, get_settings
 
 
 class AlertPolicy(Base):
@@ -56,19 +58,28 @@ class AlertEvent:
     occurred_at: str | None = None
 
 
-def get_policy(session: Session, domain: str) -> AlertPolicy:
-    return session.get(AlertPolicy, domain) or AlertPolicy(
-        domain_name=domain, threshold_days=30, reminder_interval_hours=168, enabled=True, channel="email"
+def get_policy(session: Session, domain: str, defaults: NotificationSettings | None = None) -> AlertPolicy:
+    """Politique propre au domaine, sinon celle dérivée des paramètres globaux."""
+    policy = session.get(AlertPolicy, domain)
+    if policy is not None:
+        return policy
+    defaults = defaults or get_settings(session, GLOBAL_SCOPE)
+    return AlertPolicy(
+        domain_name=domain, threshold_days=defaults.threshold_days, reminder_interval_hours=168,
+        enabled=defaults.enabled, channel=defaults.channel,
     )
 
 
 def select_alert_events(session: Session, results: Iterable[dict], now: datetime | None = None) -> list[AlertEvent]:
     now = now or datetime.utcnow()
     occurred_at = now.isoformat(timespec="seconds")
+    settings = get_settings(session, GLOBAL_SCOPE)
+    if not settings.enabled:
+        return []
     events = []
     for certificate in results:
         domain = certificate["domain"]
-        policy = get_policy(session, domain)
+        policy = get_policy(session, domain, settings)
         state = session.get(AlertState, domain)
         current_state = state.state if state else "healthy"
         is_critical = certificate["status"] == "Erreur" or (

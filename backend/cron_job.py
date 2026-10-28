@@ -14,12 +14,12 @@ try:
     from .database import SessionLocal, initialize_database, list_domains, save_statuses
     from .alerts import record_notification, select_alert_events
     from .notifications import deliver_events
-    from .settings import NotificationSettings
+    from .settings import GLOBAL_SCOPE, get_settings, settings_to_dict
 except ImportError:
     from database import SessionLocal, initialize_database, list_domains, save_statuses
     from alerts import record_notification, select_alert_events
     from notifications import deliver_events
-    from settings import NotificationSettings
+    from settings import GLOBAL_SCOPE, get_settings, settings_to_dict
 
 # Seuil en jours pour considérer qu'un certificat "Expire bientôt"
 ALERT_THRESHOLD_DAYS = 30
@@ -196,8 +196,9 @@ async def main():
     # Filtrage des certificats critiques et envoi de l'email
     with SessionLocal() as session:
         events = select_alert_events(session, results)
+        recipients = settings_to_dict(get_settings(session, GLOBAL_SCOPE))["recipients"]
     if events:
-        deliveries = deliver_events(events)
+        deliveries = deliver_events(events, email_recipients=recipients or None)
         with SessionLocal() as session:
             for delivery in deliveries:
                 record_notification(

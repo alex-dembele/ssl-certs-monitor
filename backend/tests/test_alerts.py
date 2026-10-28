@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from backend.alerts import AlertState, NotificationLog, record_notification, select_alert_events
 from backend.database import Base, Domain
 from backend.notifications import idempotency_key
+from backend.settings import GLOBAL_SCOPE, NotificationSettings
 
 
 def test_alerts_are_deduplicated_reminded_and_resolved(tmp_path):
@@ -58,3 +59,23 @@ def test_successive_reminders_keep_distinct_delivery_records(tmp_path):
         assert keys[0] != keys[1]
         logged = session.scalars(select(NotificationLog.event_type).where(NotificationLog.event_type == "reminder")).all()
         assert len(logged) == 2
+
+
+def test_global_settings_drive_domains_without_policy(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'global.db'}")
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine)
+    now = datetime(2026, 1, 1)
+    certificate = {"domain": "example.com", "status": "OK", "days_left": 20}
+
+    with sessions() as session:
+        session.add_all([Domain(name="example.com"), NotificationSettings(scope=GLOBAL_SCOPE, threshold_days=14, channel="slack")])
+        session.commit()
+        assert select_alert_events(session, [certificate], now) == []
+
+        session.get(NotificationSettings, GLOBAL_SCOPE).threshold_days = 30
+        events = select_alert_events(session, [certificate], now)
+        assert [(event.event_type, event.channel) for event in events] == [("problem", "slack")]
+
+        session.get(NotificationSettings, GLOBAL_SCOPE).enabled = False
+        assert select_alert_events(session, [certificate], now) == []
