@@ -191,6 +191,8 @@ Ces mêmes contrôles sont exécutés automatiquement par [la CI](.github/workfl
 - `GET /api/domains` - List all monitored domains
 - `POST /api/domains/bulk` - Add multiple domains
 - `DELETE /api/domains/{domain_name}` - Remove a domain
+- `GET /api/domains/{domain_name}/alert-policy` - Read a domain alert policy
+- `PUT /api/domains/{domain_name}/alert-policy` - Configure threshold, reminders and channel
 - `GET /api/check/{domain_name}` - Check single domain certificate
 - `GET /health` - Health check endpoint
 
