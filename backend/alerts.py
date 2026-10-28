@@ -52,6 +52,8 @@ class AlertEvent:
     event_type: str
     channel: str
     certificate: dict
+    # Moment où l'événement a été émis : distingue deux rappels du même certificat.
+    occurred_at: str | None = None
 
 
 def get_policy(session: Session, domain: str) -> AlertPolicy:
@@ -62,6 +64,7 @@ def get_policy(session: Session, domain: str) -> AlertPolicy:
 
 def select_alert_events(session: Session, results: Iterable[dict], now: datetime | None = None) -> list[AlertEvent]:
     now = now or datetime.utcnow()
+    occurred_at = now.isoformat(timespec="seconds")
     events = []
     for certificate in results:
         domain = certificate["domain"]
@@ -74,12 +77,12 @@ def select_alert_events(session: Session, results: Iterable[dict], now: datetime
         if not policy.enabled:
             continue
         if is_critical and current_state == "healthy":
-            events.append(AlertEvent(domain, "problem", policy.channel, certificate))
+            events.append(AlertEvent(domain, "problem", policy.channel, certificate, occurred_at))
         elif is_critical and current_state == "critical" and state and state.last_notified_at:
             if now >= state.last_notified_at + timedelta(hours=policy.reminder_interval_hours):
-                events.append(AlertEvent(domain, "reminder", policy.channel, certificate))
+                events.append(AlertEvent(domain, "reminder", policy.channel, certificate, occurred_at))
         elif not is_critical and current_state == "critical":
-            events.append(AlertEvent(domain, "resolved", policy.channel, certificate))
+            events.append(AlertEvent(domain, "resolved", policy.channel, certificate, occurred_at))
     return events
 
 

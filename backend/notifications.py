@@ -42,6 +42,7 @@ def idempotency_key(event: AlertEvent) -> str:
         "status": certificate.get("status"),
         "expiry": certificate.get("expiry_date"),
         "fingerprint": certificate.get("fingerprint"),
+        "occurred_at": event.occurred_at,
     }
     return hashlib.sha256(json.dumps(stable, sort_keys=True).encode()).hexdigest()
 
