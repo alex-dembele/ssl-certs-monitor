@@ -1,5 +1,7 @@
 # Guide Complet: Déploiement OpenCert sur Render.com
 
+> Variante hébergée. Le déploiement de référence est Docker Compose. Utilisez la branche `main` et configurez PostgreSQL : ce projet ne supporte pas MongoDB.
+
 ## 📋 Table des matières
 1. [Création du compte Render](#création-du-compte-render)
 2. [Déploiement via Blueprint (Méthode 1-Click)](#déploiement-via-blueprint-méthode-1-click)
@@ -49,13 +51,13 @@ Une page apparaîtra avec les détails pré-remplis:
 Source Code:  opendefender/OpenCert
 Name:         ssl-certs-monitor
 Language:     Docker
-Branch:       main ⚠️ CHANGE EN "develop"
+Branch:       main
 Region:       Oregon (US West)
 Root Dir:     (vide)
 Dockerfile:   (vide)
 ```
 
-**IMPORTANT**: Changer la branche de **main** à **develop** car c'est là que se trouvent les corrections!
+**IMPORTANT**: conserver la branche **main** ; les corrections publiées y sont intégrées.
 
 ### Étape 3: Créer le Blueprint
 1. Cliquer **"Deploy"**

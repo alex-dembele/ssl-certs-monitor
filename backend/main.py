@@ -1,14 +1,13 @@
 # Fichier: backend/main.py
-import re
 import os
 import json
 from datetime import datetime, timezone
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import List
+from typing import Any, List, Literal
 from database import Domain, SessionLocal, add_domains, delete_domain as remove_domain, initialize_database, list_domains, list_statuses, save_statuses
-from alerts import AlertEvent, AlertPolicy, get_policy
+from alerts import AlertEvent, AlertPolicy, AlertRule, DomainContext, VALID_SCOPES, get_policy, resolve_alert_rule, rule_to_dict
 from settings import DEFAULTS, SettingsAuditLog, get_settings, settings_to_dict
 from notifications import deliver_events
 # On importe la fonction de check unique
@@ -49,6 +48,29 @@ class SettingsUpdate(BaseModel):
 class NotificationTest(BaseModel):
     scope: str = Field(default="personal", pattern="^(personal|organization)$")
 
+class AlertRulePayload(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    scope_type: Literal["organization", "team", "project", "environment", "domain"]
+    scope_key: str = Field(min_length=1, max_length=253)
+    priority: int = Field(default=0, ge=-10000, le=10000)
+    severity: str = Field(default="warning", pattern="^(info|warning|critical)$")
+    threshold_days: int = Field(default=30, ge=1, le=3650)
+    reminder_interval_hours: int = Field(default=168, ge=0, le=8760)
+    conditions: dict[str, Any] = Field(default_factory=dict)
+    channels: List[Literal["email", "webhook", "slack", "teams", "discord"]] = Field(default_factory=lambda: ["email"])
+    enabled: bool = True
+
+class DomainContextUpdate(BaseModel):
+    organization: str | None = Field(default=None, max_length=128)
+    team: str | None = Field(default=None, max_length=128)
+    project: str | None = Field(default=None, max_length=128)
+    environment: str | None = Field(default=None, max_length=64)
+    criticality: str | None = Field(default=None, max_length=32)
+
+class AlertPreviewRequest(BaseModel):
+    domain: str
+    certificate: dict[str, Any]
+
 initialize_database()
 
 async def require_api_auth(authorization: str | None = Header(default=None)):
@@ -67,16 +89,29 @@ async def get_status():
 
 @app.post("/api/domains/bulk", dependencies=[Depends(require_api_auth)])
 async def add_bulk_domains(domain_list: DomainList):
-    domain_regex = re.compile(r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
-    valid_domains = {d.strip() for d in domain_list.domains if domain_regex.match(d.strip())}
-    if not valid_domains:
-        raise HTTPException(status_code=400, detail="Aucun nouveau domaine valide (format invalide ou doublon).")
+    invalid = []
+    candidates = []
+    duplicates = []
+    seen = set()
+    for value in domain_list.domains:
+        normalized = normalize_domain(value)
+        if normalized is None:
+            invalid.append({"value": value, "reason": "Format de domaine invalide."})
+        elif normalized in seen:
+            duplicates.append(normalized)
+        else:
+            seen.add(normalized)
+            candidates.append(normalized)
 
     with SessionLocal() as session:
-        added = add_domains(session, valid_domains)
-    if not added:
-        raise HTTPException(status_code=400, detail="Aucun nouveau domaine valide (format invalide ou doublon).")
-    return {"message": f"{added} domaine(s) ajouté(s) à la liste de surveillance."}
+        added = add_domains(session, candidates)
+    duplicates.extend(domain for domain in candidates if domain not in added)
+    return {
+        "message": f"{len(added)} domaine(s) ajouté(s), {len(duplicates)} doublon(s), {len(invalid)} entrée(s) invalide(s).",
+        "added": added,
+        "duplicates": sorted(set(duplicates)),
+        "invalid": invalid,
+    }
 
 @app.get("/api/check/{domain_name}", dependencies=[Depends(require_api_auth)])
 async def check_single_domain(domain_name: str):
@@ -170,3 +205,94 @@ async def test_notification(request: NotificationTest):
     if not delivery.success:
         raise HTTPException(status_code=502, detail=delivery.error_message or "Échec de la notification de test.")
     return {"message": "Notification de test envoyée.", "channel": settings.channel, "attempts": delivery.attempts}
+
+def require_team(team_id: str | None) -> str:
+    if not team_id:
+        raise HTTPException(status_code=403, detail="X-Team-Id est requis pour gérer les règles.")
+    return team_id
+
+@app.get("/api/alert-rules", dependencies=[Depends(require_api_auth)])
+async def list_alert_rules(team_id: str | None = Header(default=None, alias="X-Team-Id")):
+    owner = require_team(team_id)
+    with SessionLocal() as session:
+        return {"rules": [rule_to_dict(rule) for rule in session.query(AlertRule).filter(AlertRule.owner_team == owner).order_by(AlertRule.priority.desc(), AlertRule.id)]}
+
+@app.post("/api/alert-rules", dependencies=[Depends(require_api_auth)])
+async def create_alert_rule(rule: AlertRulePayload, team_id: str | None = Header(default=None, alias="X-Team-Id")):
+    owner = require_team(team_id)
+    if rule.scope_type not in VALID_SCOPES:
+        raise HTTPException(status_code=422, detail="Portée de règle invalide.")
+    with SessionLocal() as session:
+        created = AlertRule(
+            name=rule.name, scope_type=rule.scope_type, scope_key=rule.scope_key, owner_team=owner,
+            priority=rule.priority, severity=rule.severity, threshold_days=rule.threshold_days,
+            reminder_interval_hours=rule.reminder_interval_hours, conditions=json.dumps(rule.conditions),
+            channels=json.dumps(rule.channels), enabled=rule.enabled,
+        )
+        session.add(created)
+        session.commit()
+        return rule_to_dict(created)
+
+@app.put("/api/alert-rules/{rule_id}", dependencies=[Depends(require_api_auth)])
+async def update_alert_rule(rule_id: int, rule: AlertRulePayload, team_id: str | None = Header(default=None, alias="X-Team-Id")):
+    owner = require_team(team_id)
+    with SessionLocal() as session:
+        current = session.get(AlertRule, rule_id)
+        if current is None:
+            raise HTTPException(status_code=404, detail="Règle non trouvée.")
+        if current.owner_team != owner:
+            raise HTTPException(status_code=403, detail="Cette règle appartient à une autre équipe.")
+        for field in ("name", "scope_type", "scope_key", "priority", "severity", "threshold_days", "reminder_interval_hours", "enabled"):
+            setattr(current, field, getattr(rule, field))
+        current.conditions = json.dumps(rule.conditions)
+        current.channels = json.dumps(rule.channels)
+        session.commit()
+        return rule_to_dict(current)
+
+@app.delete("/api/alert-rules/{rule_id}", dependencies=[Depends(require_api_auth)])
+async def delete_alert_rule(rule_id: int, team_id: str | None = Header(default=None, alias="X-Team-Id")):
+    owner = require_team(team_id)
+    with SessionLocal() as session:
+        current = session.get(AlertRule, rule_id)
+        if current is None:
+            raise HTTPException(status_code=404, detail="Règle non trouvée.")
+        if current.owner_team != owner:
+            raise HTTPException(status_code=403, detail="Cette règle appartient à une autre équipe.")
+        session.delete(current)
+        session.commit()
+    return {"message": "Règle supprimée."}
+
+@app.put("/api/domains/{domain_name}/context", dependencies=[Depends(require_api_auth)])
+async def update_domain_context(domain_name: str, update: DomainContextUpdate, team_id: str | None = Header(default=None, alias="X-Team-Id")):
+    owner = require_team(team_id)
+    with SessionLocal() as session:
+        if not session.get(Domain, domain_name):
+            raise HTTPException(status_code=404, detail="Domaine non trouvé.")
+        if update.team and update.team != owner:
+            raise HTTPException(status_code=403, detail="Une équipe ne peut pas modifier le contexte d'une autre équipe.")
+        context = session.get(DomainContext, domain_name) or DomainContext(domain_name=domain_name)
+        for field in ("organization", "team", "project", "environment", "criticality"):
+            setattr(context, field, getattr(update, field))
+        session.add(context)
+        session.commit()
+        return {field: getattr(context, field) for field in ("domain_name", "organization", "team", "project", "environment", "criticality")}
+
+@app.post("/api/alert-rules/preview", dependencies=[Depends(require_api_auth)])
+async def preview_alert_rule(request: AlertPreviewRequest, team_id: str | None = Header(default=None, alias="X-Team-Id")):
+    require_team(team_id)
+    with SessionLocal() as session:
+        rule = resolve_alert_rule(session, request.domain, request.certificate)
+        if rule is None:
+            return {"matched": False, "explanation": "Aucune règle spécifique ; politique par défaut."}
+        return {"matched": True, "explanation": f"Règle '{rule.name}' (priorité {rule.priority})", "rule": rule_to_dict(rule)}
+
+@app.post("/api/alert-rules/{rule_id}/test", dependencies=[Depends(require_api_auth)])
+async def test_alert_rule(rule_id: int, team_id: str | None = Header(default=None, alias="X-Team-Id")):
+    owner = require_team(team_id)
+    with SessionLocal() as session:
+        rule = session.get(AlertRule, rule_id)
+        if rule is None:
+            raise HTTPException(status_code=404, detail="Règle non trouvée.")
+        if rule.owner_team != owner:
+            raise HTTPException(status_code=403, detail="Cette règle appartient à une autre équipe.")
+        return {"dry_run": True, "message": "Règle valide ; aucune notification réelle n'a été envoyée.", "rule": rule_to_dict(rule)}

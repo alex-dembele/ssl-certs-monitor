@@ -192,7 +192,7 @@ npm run typecheck
 npm run build
 ```
 
-Ces mêmes contrôles sont exécutés automatiquement par [la CI](.github/workflows/ci.yml) sur chaque pull request et chaque push vers `main`.
+Ces contrôles sont à exécuter localement avant chaque pull request.
 
 ### API Endpoints
 
@@ -201,11 +201,18 @@ Ces mêmes contrôles sont exécutés automatiquement par [la CI](.github/workfl
 - `DELETE /api/domains/{domain_name}` - Remove a domain
 - `GET /api/domains/{domain_name}/alert-policy` - Read a domain alert policy
 - `PUT /api/domains/{domain_name}/alert-policy` - Configure threshold, reminders and channel
+- `GET/POST /api/alert-rules` - List or create prioritized scoped alert rules
+- `PUT/DELETE /api/alert-rules/{rule_id}` - Update or delete a team-owned rule
+- `POST /api/alert-rules/preview` - Explain which rule matches a certificate result
+- `POST /api/alert-rules/{rule_id}/test` - Validate a rule without sending a notification
+- `PUT /api/domains/{domain_name}/context` - Set organization/team/project/environment context
 - `GET /api/check/{domain_name}` - Check single domain certificate
 - `GET /api/settings` - Read personal and organization settings
 - `PUT /api/settings/{scope}` - Update `personal` or `organization` settings
 - `POST /api/notifications/test` - Send a test notification
 - `GET /health` - Health check endpoint
+
+Rule-management endpoints require the authenticated `X-Team-Id` context. Rules are owned by that team and cannot be modified by another team.
 
 ## Contributing
 
@@ -222,6 +229,31 @@ Please ensure your code follows the project's style guidelines and includes test
 ## License
 
 OpenCert is open-core: the Community Edition is licensed under the GNU AGPL v3.0 (see [LICENSE](LICENSE)), and commercial licensing is available. See [LICENSING.md](LICENSING.md) for details.
+
+## Déploiement de référence
+
+Docker Compose est le parcours recommandé et validé pour une installation complète. Il lance le frontend, l’API, PostgreSQL et le worker de vérification.
+
+```bash
+cp .env.example .env
+# En production, renseigner POSTGRES_PASSWORD, BACKEND_API_TOKEN,
+# APP_ENV=production et CORS_ORIGINS dans .env.
+docker compose up -d --build
+docker compose ps
+```
+
+Les données sont conservées dans le volume PostgreSQL `postgres_data`. Pour importer une ancienne liste JSON de domaines au premier démarrage, définir `LEGACY_DOMAINS_FILE`. Les offres gratuites des plateformes hébergées peuvent changer ; elles doivent toutes fournir un PostgreSQL persistant, un service API, le frontend et le worker.
+
+Après le déploiement, exécutez le smoke test depuis la racine :
+
+```bash
+chmod +x scripts/smoke-test.sh
+BASE_URL=http://localhost:3000 API_URL=http://localhost:8000 \
+  BACKEND_API_TOKEN="$(grep '^BACKEND_API_TOKEN=' .env | cut -d= -f2-)" \
+  ./scripts/smoke-test.sh
+```
+
+Le MVP ne fournit pas de RBAC/multi-utilisateur, de haute disponibilité ni de sauvegardes PostgreSQL automatisées. Prévoir ces éléments au niveau de l’infrastructure en production.
 
 ## Contact
 

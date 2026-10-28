@@ -1,5 +1,4 @@
 # Fichier: docker-compose.yml
-version: '3.8'
 
 services:
   frontend:
@@ -52,7 +51,6 @@ services:
 
   backend-cron:
     build: ./backend
-    env_file: [ ".env" ]
     dns: [ "8.8.8.8", "1.1.1.1" ]
     restart: unless-stopped
     depends_on:
@@ -65,6 +63,19 @@ services:
       - DATABASE_URL=postgresql+psycopg://monitor:${POSTGRES_PASSWORD:-monitor}@db:5432/ssl_monitor
       # Utilisé tant que l'intervalle n'est pas défini dans Paramètres > Organisation.
       - CHECK_INTERVAL_MINUTES=${CHECK_INTERVAL_MINUTES:-60}
+      - SMTP_SERVER=${SMTP_SERVER:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_SENDER_EMAIL=${SMTP_SENDER_EMAIL:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - ALERT_RECIPIENTS=${ALERT_RECIPIENTS:-}
+      - ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL:-}
+      - ALERT_WEBHOOK_SECRET=${ALERT_WEBHOOK_SECRET:-}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - SLACK_WEBHOOK_SECRET=${SLACK_WEBHOOK_SECRET:-}
+      - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL:-}
+      - TEAMS_WEBHOOK_SECRET=${TEAMS_WEBHOOK_SECRET:-}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+      - DISCORD_WEBHOOK_SECRET=${DISCORD_WEBHOOK_SECRET:-}
     command: ["python", "scheduler.py"]
 
 volumes:
