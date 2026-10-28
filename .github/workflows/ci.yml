@@ -18,9 +18,11 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - run: python -m pip install -r requirements.txt pytest httpx
-      - run: python -m pytest tests -q
+          cache-dependency-path: backend/requirements*.txt
+      - run: python -m pip install -r requirements-dev.txt
+      # Les tests importent le paquet backend : ils tournent depuis la racine.
+      - run: python -m pytest backend/tests -q
+        working-directory: .
       - run: python -m compileall -q .
 
   frontend:
