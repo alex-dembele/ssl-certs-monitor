@@ -1,4 +1,4 @@
-# SSL Certificates Monitor
+# OpenCert
 
 ![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)  
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue)  
@@ -7,7 +7,7 @@
 
 ## Description
 
-SSL Certificates Monitor is a comprehensive solution designed to monitor the status, expiration, and validity of SSL/TLS certificates for multiple domains. This tool helps ensure your websites remain secure by providing real-time insights into certificate health, preventing unexpected downtimes due to expired or invalid certificates.
+OpenCert (formerly SSL Certificates Monitor) is the certificate monitoring product of the [OpenDefender](https://github.com/opendefender) suite. It is a comprehensive solution designed to monitor the status, expiration, and validity of SSL/TLS certificates for multiple domains. This tool helps ensure your websites remain secure by providing real-time insights into certificate health, preventing unexpected downtimes due to expired or invalid certificates.
 
 The application consists of a backend service for certificate checking and a frontend user interface for visualization and management. It supports monitoring multiple domains, historical tracking, and basic alerting mechanisms.
 
@@ -41,8 +41,8 @@ The application consists of a backend service for certificate checking and a fro
 
 1. Clone the repository:
    ```
-   git clone https://github.com/alex-dembele/ssl-certs-monitor.git
-   cd ssl-certs-monitor
+   git clone https://github.com/opendefender/OpenCert.git
+   cd OpenCert
    ```
 
 2. Create a `.env` file (copy from `.env.example`):
@@ -110,7 +110,7 @@ This project can be deployed for **free** on several platforms:
 
 #### 🚀 **Render.com** (Recommended)
 - **Plan**: Free tier (750 hours/month per service)
-- **Deploy in 1 click**: [Deploy to Render](https://render.com/deploy?repo=https://github.com/alex-dembele/ssl-certs-monitor)
+- **Deploy in 1 click**: [Deploy to Render](https://render.com/deploy?repo=https://github.com/opendefender/OpenCert)
 - Frontend: `ssl-cert-monitor-frontend.onrender.com`
 - Backend: `ssl-cert-monitor-api.onrender.com`
 
@@ -218,4 +218,4 @@ OpenCert is open-core: the Community Edition is licensed under the GNU AGPL v3.0
 
 For questions or support, open an issue on GitHub or contact the maintainer.
 
-Thank you for using SSL Certificates Monitor! 🔒
+Thank you for using OpenCert! 🔒

@@ -1,4 +1,4 @@
-# Guide de Déploiement Gratuit - SSL Cert Monitor
+# Guide de Déploiement Gratuit - OpenCert
 
 ## Options de déploiement recommandées
 
@@ -13,7 +13,7 @@
 
 **Comment déployer:**
 1. Créer un compte sur [render.com](https://render.com)
-2. Connecter votre repository GitHub (alex-dembele/ssl-certs-monitor)
+2. Connecter votre repository GitHub (opendefender/OpenCert)
 3. Créer un nouveau service Web (Blueprint ou manuel)
 4. Configurer:
    - Build Command: `npm install && npm run build` (pour le frontend)

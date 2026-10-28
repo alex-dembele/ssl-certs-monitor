@@ -7,7 +7,7 @@ import "@fontsource/inter/700.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SSL-Cert-Monitor Dashboard",
+  title: "OpenCert",
   description: "Surveillez vos certificats SSL comme un pro",
 };
 

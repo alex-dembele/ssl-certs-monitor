@@ -3,7 +3,7 @@
 # Script de déploiement rapide sur Render.com
 # Usage: bash deploy-render.sh
 
-echo "🚀 Préparation du déploiement SSL Cert Monitor sur Render.com"
+echo "🚀 Préparation du déploiement OpenCert sur Render.com"
 echo ""
 echo "Prérequis:"
 echo "1. Compte Render.com créé (https://render.com)"
@@ -13,7 +13,7 @@ echo "Options de déploiement:"
 echo ""
 echo "Option 1: Déploiement automatique via Blueprint (RECOMMANDÉ)"
 echo "=================================================="
-echo "1. Aller sur: https://render.com/deploy?repo=https://github.com/alex-dembele/ssl-certs-monitor"
+echo "1. Aller sur: https://render.com/deploy?repo=https://github.com/opendefender/OpenCert"
 echo "2. Connecter GitHub si nécessaire"
 echo "3. Revérifier les paramètres"
 echo "4. Cliquer 'Deploy'"
