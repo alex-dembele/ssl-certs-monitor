@@ -1,5 +1,4 @@
 # Fichier: backend/main.py
-import re
 import os
 import json
 from datetime import datetime, timezone
@@ -67,16 +66,29 @@ async def get_status():
 
 @app.post("/api/domains/bulk", dependencies=[Depends(require_api_auth)])
 async def add_bulk_domains(domain_list: DomainList):
-    domain_regex = re.compile(r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
-    valid_domains = {d.strip() for d in domain_list.domains if domain_regex.match(d.strip())}
-    if not valid_domains:
-        raise HTTPException(status_code=400, detail="Aucun nouveau domaine valide (format invalide ou doublon).")
+    invalid = []
+    candidates = []
+    duplicates = []
+    seen = set()
+    for value in domain_list.domains:
+        normalized = normalize_domain(value)
+        if normalized is None:
+            invalid.append({"value": value, "reason": "Format de domaine invalide."})
+        elif normalized in seen:
+            duplicates.append(normalized)
+        else:
+            seen.add(normalized)
+            candidates.append(normalized)
 
     with SessionLocal() as session:
-        added = add_domains(session, valid_domains)
-    if not added:
-        raise HTTPException(status_code=400, detail="Aucun nouveau domaine valide (format invalide ou doublon).")
-    return {"message": f"{added} domaine(s) ajouté(s) à la liste de surveillance."}
+        added = add_domains(session, candidates)
+    duplicates.extend(domain for domain in candidates if domain not in added)
+    return {
+        "message": f"{len(added)} domaine(s) ajouté(s), {len(duplicates)} doublon(s), {len(invalid)} entrée(s) invalide(s).",
+        "added": added,
+        "duplicates": sorted(set(duplicates)),
+        "invalid": invalid,
+    }
 
 @app.get("/api/check/{domain_name}", dependencies=[Depends(require_api_auth)])
 async def check_single_domain(domain_name: str):

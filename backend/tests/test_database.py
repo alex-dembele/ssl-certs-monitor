@@ -12,9 +12,9 @@ def test_concurrent_safe_upserts_and_status_persistence(tmp_path):
     sessions = sessionmaker(bind=engine)
 
     with sessions() as session:
-        assert add_domains(session, ["example.com", "example.net"]) == 2
+        assert add_domains(session, ["example.com", "example.net"]) == ["example.com", "example.net"]
     with sessions() as session:
-        assert add_domains(session, ["example.com", "example.org"]) == 1
+        assert add_domains(session, ["example.com", "example.org"]) == ["example.org"]
 
     with sessions() as session:
         save_statuses(

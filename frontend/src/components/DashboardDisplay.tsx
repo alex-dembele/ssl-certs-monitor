@@ -94,9 +94,13 @@ export default function DashboardDisplay() {
     const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
     const [sortKey, setSortKey] = useState<SortKey>('days_left');
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+    const isRefreshingRef = useRef(false);
 
     const fetchInitialData = useCallback(async () => {
-        if (!isLoading) setIsLoading(true);
+        if (isRefreshingRef.current) return;
+
+        isRefreshingRef.current = true;
+        setIsLoading(true);
         try {
             const statusRes = await fetch(`${API_BASE_URL}/api/status?t=${new Date().getTime()}`).catch(() => null);
             const domainsRes = await fetch(`${API_BASE_URL}/api/domains`).catch(() => null);
@@ -117,9 +121,10 @@ export default function DashboardDisplay() {
             else { setError("Une erreur de type inconnu est survenue."); }
             setCertificates([]);
         } finally {
+            isRefreshingRef.current = false;
             setIsLoading(false);
         }
-    }, [isLoading]);
+    }, []);
 
     useEffect(() => {
         const initialLoad = setTimeout(() => {
@@ -133,13 +138,17 @@ export default function DashboardDisplay() {
     }, [fetchInitialData]);
 
     const handleDomainsAdded = (newDomains: string[]) => {
-        const placeholderCerts: Certificate[] = newDomains.map(domain => ({
+        const uniqueDomains = [...new Set(newDomains)];
+        const placeholderCerts: Certificate[] = uniqueDomains.map(domain => ({
             domain,
             status: 'Vérification...',
         }));
-        setCertificates(prevCerts => [...prevCerts, ...placeholderCerts]);
+        setCertificates(prevCerts => {
+            const existing = new Set(prevCerts.map(cert => cert.domain));
+            return [...prevCerts, ...placeholderCerts.filter(cert => !existing.has(cert.domain))];
+        });
 
-        newDomains.forEach(async (domain) => {
+        uniqueDomains.forEach(async (domain) => {
             try {
                 const res = await fetch(`${API_BASE_URL}/api/check/${domain}`);
                 if (!res.ok) throw new Error("La vérification a échoué.");
