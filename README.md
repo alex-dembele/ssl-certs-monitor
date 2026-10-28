@@ -195,7 +195,14 @@ Ces mêmes contrôles sont exécutés automatiquement par [la CI](.github/workfl
 - `DELETE /api/domains/{domain_name}` - Remove a domain
 - `GET /api/domains/{domain_name}/alert-policy` - Read a domain alert policy
 - `PUT /api/domains/{domain_name}/alert-policy` - Configure threshold, reminders and channel
+- `GET/POST /api/alert-rules` - List or create prioritized scoped alert rules
+- `PUT/DELETE /api/alert-rules/{rule_id}` - Update or delete a team-owned rule
+- `POST /api/alert-rules/preview` - Explain which rule matches a certificate result
+- `POST /api/alert-rules/{rule_id}/test` - Validate a rule without sending a notification
+- `PUT /api/domains/{domain_name}/context` - Set organization/team/project/environment context
 - `GET /api/check/{domain_name}` - Check single domain certificate
+
+Rule-management endpoints require the authenticated `X-Team-Id` context. Rules are owned by that team and cannot be modified by another team.
 - `GET /health` - Health check endpoint
 
 ## Contributing
