@@ -76,8 +76,9 @@ services:
       - PYTHONUNBUFFERED=1
       - DATABASE_URL=postgresql+psycopg://monitor:${POSTGRES_PASSWORD:-monitor}@db:5432/ssl_monitor
       - LEGACY_DOMAINS_FILE=/app/domains.json
-    command: >
-      sh -c "while true; do python cron_job.py; sleep 86400; done"
+      # Utilisé tant que l'intervalle n'est pas défini dans Paramètres > Organisation.
+      - CHECK_INTERVAL_MINUTES=${CHECK_INTERVAL_MINUTES:-60}
+    command: ["python", "scheduler.py"]
 
 volumes:
   api_data:
