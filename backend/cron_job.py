@@ -29,6 +29,7 @@ DNS_TIMEOUT = float(os.getenv("SSL_CHECK_DNS_TIMEOUT", "5"))
 CONNECT_TIMEOUT = float(os.getenv("SSL_CHECK_CONNECT_TIMEOUT", "5"))
 TLS_TIMEOUT = float(os.getenv("SSL_CHECK_TLS_TIMEOUT", "5"))
 RETRY_BACKOFF = float(os.getenv("SSL_CHECK_RETRY_BACKOFF", "0.25"))
+TLS_PORT = 443
 HOSTNAME_PATTERN = re.compile(r"^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$")
 
 
@@ -78,7 +79,7 @@ async def _check_once(hostname: str) -> Dict:
     loop = asyncio.get_running_loop()
     try:
         addresses = await asyncio.wait_for(
-            loop.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM), DNS_TIMEOUT
+            loop.getaddrinfo(hostname, TLS_PORT, type=socket.SOCK_STREAM), DNS_TIMEOUT
         )
     except asyncio.TimeoutError as error:
         raise SSLCheckError("timeout_dns", "La résolution DNS a expiré.", True) from error
@@ -90,22 +91,24 @@ async def _check_once(hostname: str) -> Dict:
     if not addresses:
         raise SSLCheckError("erreur_dns", "Aucune adresse DNS retournée.")
 
-    address = addresses[0][4][0]
+    family, _, proto, _, sockaddr = addresses[0]
     writer = None
+    sock = socket.socket(family, socket.SOCK_STREAM, proto)
+    sock.setblocking(False)
     try:
         try:
-            _, writer = await asyncio.wait_for(
-                asyncio.open_connection(address, 443), CONNECT_TIMEOUT
-            )
+            await asyncio.wait_for(loop.sock_connect(sock, sockaddr), CONNECT_TIMEOUT)
         except asyncio.TimeoutError as error:
             raise SSLCheckError("timeout_connexion", "La connexion TCP a expiré.", True) from error
         except OSError as error:
             raise SSLCheckError("erreur_connexion", str(error), True) from error
 
+        # TLS sur la socket déjà connectée : garde des délais distincts TCP/TLS
+        # sans StreamWriter.start_tls, absent avant Python 3.11 (#97).
         context = ssl.create_default_context()
         try:
-            await asyncio.wait_for(
-                writer.start_tls(context, server_hostname=hostname), TLS_TIMEOUT
+            _, writer = await asyncio.wait_for(
+                asyncio.open_connection(sock=sock, ssl=context, server_hostname=hostname), TLS_TIMEOUT
             )
         except asyncio.TimeoutError as error:
             raise SSLCheckError("timeout_tls", "La négociation TLS a expiré.", True) from error
@@ -148,6 +151,8 @@ async def _check_once(hostname: str) -> Dict:
                 await writer.wait_closed()
             except Exception:
                 pass
+        else:
+            sock.close()
 
 
 async def get_ssl_expiry_info(hostname: str) -> Dict:
@@ -159,6 +164,9 @@ async def get_ssl_expiry_info(hostname: str) -> Dict:
             if not error.retryable or attempt == MAX_RETRIES:
                 return _error_result(hostname, error)
             await asyncio.sleep(RETRY_BACKOFF * (2**attempt))
+        except Exception as error:
+            # Une erreur imprévue ne doit pas interrompre le lot de vérifications.
+            return _error_result(hostname, SSLCheckError("erreur_inattendue", f"{type(error).__name__}: {error}"))
 
 # --- Fonction Principale du Script ---
 async def main():
