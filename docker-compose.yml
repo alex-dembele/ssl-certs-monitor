@@ -3,10 +3,7 @@ version: '3.8'
 
 services:
   frontend:
-    build:
-      context: ./frontend
-      args:
-        BACKEND_API_URL: http://backend-api:8000
+    build: ./frontend
     ports:
       - "3000:3000"
     environment:
