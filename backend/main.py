@@ -1,11 +1,15 @@
 # Fichier: backend/main.py
 import os
+import json
+from datetime import datetime, timezone
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List
 from database import Domain, SessionLocal, add_domains, delete_domain as remove_domain, initialize_database, list_domains, list_statuses
-from alerts import AlertPolicy, get_policy
+from alerts import AlertEvent, AlertPolicy, get_policy
+from settings import DEFAULTS, SettingsAuditLog, get_settings, settings_to_dict
+from notifications import deliver_events
 # On importe la fonction de check unique
 from cron_job import get_ssl_expiry_info
 
@@ -33,6 +37,16 @@ class AlertPolicyUpdate(BaseModel):
     reminder_interval_hours: int = Field(default=168, ge=0, le=8760)
     enabled: bool = True
     channel: str = Field(default="email", pattern="^(email|webhook|slack|teams|discord)$")
+
+class SettingsUpdate(BaseModel):
+    threshold_days: int = Field(default=30, ge=1, le=3650)
+    check_interval_minutes: int = Field(default=60, ge=1, le=10080)
+    channel: str = Field(default="email", pattern="^(email|webhook|slack|teams|discord)$")
+    recipients: List[str] = Field(default_factory=list, max_length=50)
+    enabled: bool = True
+
+class NotificationTest(BaseModel):
+    scope: str = Field(default="personal", pattern="^(personal|organization)$")
 
 initialize_database()
 
@@ -119,3 +133,48 @@ async def update_alert_policy(domain_name: str, update: AlertPolicyUpdate):
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+@app.get("/api/settings", dependencies=[Depends(require_api_auth)])
+async def read_settings():
+    with SessionLocal() as session:
+        return {
+            "personal": settings_to_dict(get_settings(session, "personal")),
+            "organization": settings_to_dict(get_settings(session, "organization")),
+            "smtp_configured": bool(os.getenv("SMTP_SERVER") and os.getenv("SMTP_SENDER_EMAIL") and os.getenv("SMTP_PASSWORD")),
+        }
+
+@app.put("/api/settings/{scope}", dependencies=[Depends(require_api_auth)])
+async def update_settings(scope: str, update: SettingsUpdate):
+    if scope not in {"personal", "organization"}:
+        raise HTTPException(status_code=422, detail="Portée de paramètres invalide.")
+    with SessionLocal() as session:
+        settings = get_settings(session, scope)
+        changed = []
+        for field in ("threshold_days", "check_interval_minutes", "channel", "enabled"):
+            value = getattr(update, field)
+            if getattr(settings, field) != value:
+                setattr(settings, field, value)
+                changed.append(field)
+        recipients = [recipient.strip() for recipient in update.recipients if recipient.strip()]
+        if json.loads(settings.recipients or "[]") != recipients:
+            settings.recipients = json.dumps(recipients)
+            changed.append("recipients")
+        settings.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        session.add(settings)
+        session.add(SettingsAuditLog(scope=scope, changed_fields=json.dumps(changed)))
+        session.commit()
+        return settings_to_dict(settings)
+
+@app.post("/api/notifications/test", dependencies=[Depends(require_api_auth)])
+async def test_notification(request: NotificationTest):
+    with SessionLocal() as session:
+        settings = get_settings(session, request.scope)
+        recipients = json.loads(settings.recipients or "[]")
+    if not settings.enabled:
+        raise HTTPException(status_code=400, detail="Les notifications sont désactivées pour cette portée.")
+    event = AlertEvent("notification-test", "test", settings.channel, {"status": "OK", "days_left": None})
+    deliveries = deliver_events([event], email_recipients=recipients or None)
+    delivery = deliveries[0]
+    if not delivery.success:
+        raise HTTPException(status_code=502, detail=delivery.error_message or "Échec de la notification de test.")
+    return {"message": "Notification de test envoyée.", "channel": settings.channel, "attempts": delivery.attempts}

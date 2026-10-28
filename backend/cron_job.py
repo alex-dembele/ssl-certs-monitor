@@ -14,10 +14,12 @@ try:
     from .database import SessionLocal, initialize_database, list_domains, save_statuses
     from .alerts import record_notification, select_alert_events
     from .notifications import deliver_events
+    from .settings import NotificationSettings
 except ImportError:
     from database import SessionLocal, initialize_database, list_domains, save_statuses
     from alerts import record_notification, select_alert_events
     from notifications import deliver_events
+    from settings import NotificationSettings
 
 # Seuil en jours pour considérer qu'un certificat "Expire bientôt"
 ALERT_THRESHOLD_DAYS = 30
