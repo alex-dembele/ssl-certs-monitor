@@ -57,6 +57,7 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 def initialize_database() -> None:
     Base.metadata.create_all(engine)
     _upgrade_status_schema()
+    _upgrade_notification_schema()
     if not LEGACY_DOMAINS_FILE:
         return
 
@@ -98,6 +99,21 @@ def _upgrade_status_schema() -> None:
     with engine.begin() as connection:
         for name in missing:
             connection.execute(text(f"ALTER TABLE certificate_statuses ADD COLUMN {name} {columns[name]}"))
+
+
+def _upgrade_notification_schema() -> None:
+    columns = {
+        "idempotency_key": "VARCHAR(64)",
+        "delivery_status": "VARCHAR(16) DEFAULT 'delivered'",
+        "attempts": "INTEGER DEFAULT 1",
+    }
+    if "notification_logs" not in inspect(engine).get_table_names():
+        return
+    existing = {column["name"] for column in inspect(engine).get_columns("notification_logs")}
+    with engine.begin() as connection:
+        for name, definition in columns.items():
+            if name not in existing:
+                connection.execute(text(f"ALTER TABLE notification_logs ADD COLUMN {name} {definition}"))
 
 
 def list_domains(session: Session) -> list[str]:

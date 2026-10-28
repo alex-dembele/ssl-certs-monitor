@@ -8,15 +8,16 @@ import os
 import smtplib
 import socket
 import re
-from email.message import EmailMessage
 from datetime import datetime
 from typing import List, Dict
 try:
     from .database import SessionLocal, initialize_database, list_domains, save_statuses
     from .alerts import record_notification, select_alert_events
+    from .notifications import deliver_events
 except ImportError:
     from database import SessionLocal, initialize_database, list_domains, save_statuses
     from alerts import record_notification, select_alert_events
+    from notifications import deliver_events
 
 # Seuil en jours pour considérer qu'un certificat "Expire bientôt"
 ALERT_THRESHOLD_DAYS = 30
@@ -157,60 +158,6 @@ async def get_ssl_expiry_info(hostname: str) -> Dict:
                 return _error_result(hostname, error)
             await asyncio.sleep(RETRY_BACKOFF * (2**attempt))
 
-# --- Logique d'envoi d'email ---
-def send_summary_report(events: list) -> tuple[bool, str | None]:
-    """Envoie un rapport récapitulatif par email avec les certificats critiques."""
-    # Lit la configuration depuis les variables d'environnement chargées par Docker Compose
-    sender_email = os.getenv("SMTP_SENDER_EMAIL")
-    password = os.getenv("SMTP_PASSWORD")
-    recipients_str = os.getenv("ALERT_RECIPIENTS")
-    smtp_server = os.getenv("SMTP_SERVER")
-    smtp_port = int(os.getenv("SMTP_PORT", 587))
-
-    if not all([sender_email, password, recipients_str, smtp_server]):
-        print("-> AVERTISSEMENT: Variables d'environnement pour l'email non configurées. Envoi annulé.")
-        return False, "Configuration SMTP incomplète."
-
-    recipients = [email.strip() for email in recipients_str.split(',')]
-    
-    msg = EmailMessage()
-    has_resolution = any(event.event_type == "resolved" for event in events)
-    msg['Subject'] = f"{'✅ Résolution' if has_resolution else '🚨 Alerte'} SSL-Cert-Monitor : {len(events)} événement(s)"
-    msg['From'] = sender_email
-    msg['To'] = ", ".join(recipients)
-
-    body_lines = [
-        "Bonjour,",
-        "\nLe rapport de surveillance quotidien a identifié les certificats suivants comme étant critiques :",
-        "\n"
-    ]
-    for event in events:
-        cert = event.certificate
-        body_lines.append("----------------------------------------")
-        body_lines.append(f"Domaine : {cert['domain']}")
-        body_lines.append(f"Événement : {event.event_type}")
-        body_lines.append(f"Statut  : {cert['status']}")
-        if cert.get('days_left') is not None:
-             body_lines.append(f"Jours restants : {cert['days_left']}")
-        if cert.get('error_message'):
-            body_lines.append(f"Erreur : {cert['error_message']}")
-        body_lines.append("")
-
-    msg.set_content("\n".join(body_lines))
-
-    try:
-        print(f"-> Envoi du rapport à {', '.join(recipients)}...")
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(sender_email, password)
-            server.send_message(msg)
-        print("-> ✅ Notification email envoyée avec succès.")
-        return True, None
-    except Exception as e:
-        print(f"-> ❌ Échec de l'envoi de l'email : {e}")
-        return False, str(e)
-
-# --- Logique de vérification SSL Asynchrone ---
 # --- Fonction Principale du Script ---
 async def main():
     """Orchestre la vérification de masse et la génération de rapports."""
@@ -240,9 +187,14 @@ async def main():
     with SessionLocal() as session:
         events = select_alert_events(session, results)
     if events:
-        success, error = send_summary_report(events)
+        deliveries = deliver_events(events)
         with SessionLocal() as session:
-            record_notification(session, events, success, error)
+            for delivery in deliveries:
+                record_notification(
+                    session, [delivery.event], delivery.success, delivery.error_message,
+                    delivery_status=delivery.status, attempts=delivery.attempts,
+                    idempotency_key=delivery.idempotency_key,
+                )
     else:
         print("-> Aucun nouvel événement d'alerte. Aucun email envoyé.")
 
