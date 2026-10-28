@@ -1,7 +1,0 @@
-# Fichier: domains.txt
-google.com
-github.com
-nexah.net
-
-
-

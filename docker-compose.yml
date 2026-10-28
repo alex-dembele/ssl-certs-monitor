@@ -25,7 +25,6 @@ services:
       - APP_ENV=${APP_ENV:-development}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
       - DATABASE_URL=postgresql+psycopg://monitor:${POSTGRES_PASSWORD:-monitor}@db:5432/ssl_monitor
-      - LEGACY_DOMAINS_FILE=/app/domains.json
     dns: [ "8.8.8.8", "1.1.1.1" ]
     restart: unless-stopped
     depends_on:
@@ -64,7 +63,6 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - DATABASE_URL=postgresql+psycopg://monitor:${POSTGRES_PASSWORD:-monitor}@db:5432/ssl_monitor
-      - LEGACY_DOMAINS_FILE=/app/domains.json
       # Utilisé tant que l'intervalle n'est pas défini dans Paramètres > Organisation.
       - CHECK_INTERVAL_MINUTES=${CHECK_INTERVAL_MINUTES:-60}
     command: ["python", "scheduler.py"]

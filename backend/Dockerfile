@@ -3,7 +3,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
-RUN python -c "import json, os; os.path.exists('domains.json') or json.dump(['google.com'], open('domains.json', 'w'))"
 ENV PORT=8000
 EXPOSE 8000
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
