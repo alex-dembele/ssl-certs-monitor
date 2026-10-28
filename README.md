@@ -1,6 +1,6 @@
 # SSL Certificates Monitor
 
-![SSL Certificates Monitor](https://img.shields.io/badge/License-MIT-blue.svg)  
+![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)  
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue)  
 ![TypeScript](https://img.shields.io/badge/TypeScript-4.0%2B-blue)  
 ![Docker](https://img.shields.io/badge/Docker-Supported-blue)  
@@ -212,7 +212,7 @@ Please ensure your code follows the project's style guidelines and includes test
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+OpenCert is open-core: the Community Edition is licensed under the GNU AGPL v3.0 (see [LICENSE](LICENSE)), and commercial licensing is available. See [LICENSING.md](LICENSING.md) for details.
 
 ## Contact
 
