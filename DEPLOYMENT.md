@@ -1,4 +1,6 @@
-# Guide de Déploiement Gratuit - SSL Cert Monitor
+# Guide des variantes de déploiement - SSL Cert Monitor
+
+Le parcours de référence est [Docker Compose](README.md#déploiement-de-référence). Les offres gratuites et leurs quotas peuvent changer ; elles ne sont pas garanties par ce projet.
 
 ## Options de déploiement recommandées
 
@@ -88,7 +90,7 @@
 
 ### Étape 1: Préparer le repository
 ```bash
-git push origin develop  # ✅ Déjà fait
+git push origin main
 ```
 
 ### Étape 2: Créer le service Frontend sur Render
@@ -169,7 +171,7 @@ Domaines gratuits (.tk, .ml, .ga) sur [freenom.com](https://freenom.com)
 
 2. **Partage des volumes:**
    - Render n'a pas de partage de volume persistent entre services
-   - Solution: Utiliser une base de données (PostgreSQL, MongoDB)
+   - Solution : utiliser PostgreSQL pour chaque service ; MongoDB n’est pas supporté par l’application.
 
 3. **Monitoring:**
    - Chaque service doit avoir un healthcheck

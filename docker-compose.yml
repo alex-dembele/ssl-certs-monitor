@@ -1,18 +1,19 @@
 # Fichier: docker-compose.yml
-version: '3.8'
 
 services:
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        BACKEND_API_URL: http://backend-api:8000
     ports:
       - "3000:3000"
     environment:
       - BACKEND_API_URL=http://backend-api:8000
       - BACKEND_API_TOKEN=${BACKEND_API_TOKEN:-}
-    volumes:
-      - status_data:/app/public/data # Le frontend lit le rapport ici
     depends_on:
-      - backend-api
+      backend-api:
+        condition: service_healthy
     dns: [ "8.8.8.8", "1.1.1.1" ]
     restart: unless-stopped
 
@@ -21,8 +22,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - api_data:/app # L'API gère la liste des domaines
-      - status_data:/app/data # L'API lit le statut
+      - api_data:/app # Conserve le fichier JSON legacy pour la migration initiale
     environment:
       - PYTHONUNBUFFERED=1
       - BACKEND_API_TOKEN=${BACKEND_API_TOKEN:-}
@@ -36,7 +36,7 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -57,10 +57,8 @@ services:
 
   backend-cron:
     build: ./backend
-    env_file: [ ".env" ]
     volumes:
-      - api_data:/app # Le cron lit la liste des domaines
-      - status_data:/app/data # Le cron écrit le rapport de statut
+      - api_data:/app # Conserve le fichier JSON legacy pour la migration initiale
     dns: [ "8.8.8.8", "1.1.1.1" ]
     restart: unless-stopped
     depends_on:
@@ -77,5 +75,4 @@ services:
 
 volumes:
   api_data:
-  status_data:
   postgres_data:

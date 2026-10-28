@@ -186,7 +186,7 @@ npm run typecheck
 npm run build
 ```
 
-Ces mêmes contrôles sont exécutés automatiquement par [la CI](.github/workflows/ci.yml) sur chaque pull request et chaque push vers `main`.
+Ces contrôles sont à exécuter localement avant chaque pull request.
 
 ### API Endpoints
 
@@ -220,6 +220,31 @@ Please ensure your code follows the project's style guidelines and includes test
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## Déploiement de référence
+
+Docker Compose est le parcours recommandé et validé pour une installation complète. Il lance le frontend, l’API, PostgreSQL et le worker de vérification.
+
+```bash
+cp .env.example .env
+# En production, renseigner POSTGRES_PASSWORD, BACKEND_API_TOKEN,
+# APP_ENV=production et CORS_ORIGINS dans .env.
+docker compose up -d --build
+docker compose ps
+```
+
+Les données sont conservées dans le volume PostgreSQL `postgres_data`. Le fichier `backend/domains.json` ne sert qu’à importer une ancienne liste au premier démarrage. Les offres gratuites des plateformes hébergées peuvent changer ; elles doivent toutes fournir un PostgreSQL persistant, un service API, le frontend et le worker.
+
+Après le déploiement, exécutez le smoke test depuis la racine :
+
+```bash
+chmod +x scripts/smoke-test.sh
+BASE_URL=http://localhost:3000 API_URL=http://localhost:8000 \
+  BACKEND_API_TOKEN="$(grep '^BACKEND_API_TOKEN=' .env | cut -d= -f2-)" \
+  ./scripts/smoke-test.sh
+```
+
+Le MVP ne fournit pas de RBAC/multi-utilisateur, de haute disponibilité ni de sauvegardes PostgreSQL automatisées. Prévoir ces éléments au niveau de l’infrastructure en production.
 
 ## Contact
 

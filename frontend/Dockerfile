@@ -6,6 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
+ARG BACKEND_API_URL=http://localhost:8000
 RUN npm run build
 
 # Étape 2: Servir l'application optimisée

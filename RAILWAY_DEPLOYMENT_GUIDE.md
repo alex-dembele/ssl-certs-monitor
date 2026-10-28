@@ -1,5 +1,7 @@
 # Guide Complet: Déploiement sur Railway.app
 
+> Variante hébergée. Le déploiement de référence est Docker Compose. Utilisez la branche `main`, ajoutez un PostgreSQL persistant et configurez les variables de production.
+
 ## 📋 État actuel
 Tu as déjà 2 services créés:
 - ✅ `ssl-cert-monitor-api` (Backend)
@@ -145,7 +147,7 @@ Quand tu changes une variable:
 
 **Solution 3:** Vérifier la branche
 - Aller dans "Settings" du service
-- Vérifier que la branche est **`develop`** et pas `main`
+- Vérifier que la branche est **`main`**
 
 ### Problème: Frontend ne communique pas avec l'API
 
