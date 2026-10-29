@@ -12,6 +12,7 @@ from settings import DEFAULTS, SettingsAuditLog, get_settings, settings_to_dict
 from notifications import deliver_events
 # On importe la fonction de check unique
 from cron_job import get_ssl_expiry_info
+from domain_utils import normalize_domain
 
 app = FastAPI()
 backend_api_token = os.getenv("BACKEND_API_TOKEN")

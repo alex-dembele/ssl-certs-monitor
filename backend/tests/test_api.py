@@ -15,7 +15,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'api.db'}")
     monkeypatch.setenv("CORS_ORIGINS", "https://app.example.com")
     monkeypatch.delenv("BACKEND_API_TOKEN", raising=False)
-    for name in ("main", "database", "alerts", "settings", "notifications", "cron_job"):
+    for name in ("main", "database", "alerts", "settings", "notifications", "cron_job", "domain_utils"):
         sys.modules.pop(name, None)
     return TestClient(importlib.import_module("main").app)
 
@@ -42,3 +42,13 @@ def test_settings_update_over_cors(client):
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "https://app.example.com"
     assert response.json()["check_interval_minutes"] == 30
+
+
+def test_bulk_add_reports_added_duplicates_and_invalid_entries(client):
+    response = client.post("/api/domains/bulk", json={"domains": ["Example.COM.", "example.com", "not a domain"]})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["added"] == ["example.com"]
+    assert body["duplicates"] == ["example.com"]
+    assert [item["value"] for item in body["invalid"]] == ["not a domain"]
