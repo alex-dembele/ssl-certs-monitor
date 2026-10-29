@@ -87,6 +87,11 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
+        <p className="mt-3 text-sm text-slate-400">
+          {scope === "organization"
+            ? "Ces paramètres pilotent les vérifications planifiées et les alertes des domaines sans politique dédiée."
+            : "Ces paramètres servent à vos notifications de test ; les alertes planifiées suivent ceux de l'organisation."}
+        </p>
         <form onSubmit={save} className="mt-4 space-y-6 rounded-xl border border-slate-800 bg-slate-900/70 p-6">
           <label className="block"><span className="text-sm text-slate-300">Seuil d&apos;alerte (jours)</span><input type="number" min="1" max="3650" value={current.threshold_days} onChange={event => update("threshold_days", Number(event.target.value))} className="mt-2 w-full rounded-lg bg-slate-800 p-3" /></label>
           <label className="block"><span className="text-sm text-slate-300">Fréquence de contrôle (minutes)</span><input type="number" min="1" max="10080" value={current.check_interval_minutes} onChange={event => update("check_interval_minutes", Number(event.target.value))} className="mt-2 w-full rounded-lg bg-slate-800 p-3" /></label>

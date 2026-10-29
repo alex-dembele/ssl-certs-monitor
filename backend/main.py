@@ -6,12 +6,13 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Any, List, Literal
-from database import Domain, SessionLocal, add_domains, delete_domain as remove_domain, initialize_database, list_domains, list_statuses
+from database import Domain, SessionLocal, add_domains, delete_domain as remove_domain, initialize_database, list_domains, list_statuses, save_statuses
 from alerts import AlertEvent, AlertPolicy, AlertRule, DomainContext, VALID_SCOPES, get_policy, resolve_alert_rule, rule_to_dict
 from settings import DEFAULTS, SettingsAuditLog, get_settings, settings_to_dict
 from notifications import deliver_events
 # On importe la fonction de check unique
 from cron_job import get_ssl_expiry_info
+from domain_utils import normalize_domain
 
 app = FastAPI()
 backend_api_token = os.getenv("BACKEND_API_TOKEN")
@@ -27,7 +28,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -115,7 +116,11 @@ async def add_bulk_domains(domain_list: DomainList):
 
 @app.get("/api/check/{domain_name}", dependencies=[Depends(require_api_auth)])
 async def check_single_domain(domain_name: str):
-    return await get_ssl_expiry_info(domain_name)
+    result = await get_ssl_expiry_info(domain_name)
+    with SessionLocal() as session:
+        if session.get(Domain, domain_name):
+            save_statuses(session, [result])
+    return result
 
 @app.delete("/api/domains/{domain_name}", dependencies=[Depends(require_api_auth)])
 async def delete_domain(domain_name: str):

@@ -1,4 +1,4 @@
-# Guide Complet: Déploiement SSL Cert Monitor sur Render.com
+# Guide Complet: Déploiement OpenCert sur Render.com
 
 > Variante hébergée. Le déploiement de référence est Docker Compose. Utilisez la branche `main` et configurez PostgreSQL : ce projet ne supporte pas MongoDB.
 
@@ -24,7 +24,7 @@
 2. Cliquer **"Authorize render-oss"**
 3. Choisir votre compte utilisateur (alex-dembele)
 4. Sélectionner **"Only select repositories"** pour plus de sécurité
-5. Chercher et sélectionner **"ssl-certs-monitor"**
+5. Chercher et sélectionner **"OpenCert"**
 6. Cliquer **"Install"**
 
 ### Étape 3: Revenir sur Render
@@ -40,7 +40,7 @@
 ### Étape 1: Utiliser le lien 1-Click Deploy
 1. **Cliquer directement sur ce lien:**
    ```
-   https://render.com/deploy?repo=https://github.com/alex-dembele/ssl-certs-monitor
+   https://render.com/deploy?repo=https://github.com/opendefender/OpenCert
    ```
    (Assurez-vous que vous êtes connecté à Render)
 
@@ -48,7 +48,7 @@
 Une page apparaîtra avec les détails pré-remplis:
 
 ```
-Source Code:  alex-dembele/ssl-certs-monitor
+Source Code:  opendefender/OpenCert
 Name:         ssl-certs-monitor
 Language:     Docker
 Branch:       main
@@ -85,7 +85,7 @@ Dockerfile:   (vide)
 
 #### Étape 2: Configurer la source
 1. **Source Code:**
-   - Sélectionner: `alex-dembele/ssl-certs-monitor`
+   - Sélectionner: `opendefender/OpenCert`
    - Cliquer **"Connect"**
 
 #### Étape 3: Paramètres du service
@@ -142,7 +142,7 @@ Cliquer **"Deploy Web Service"**
 
 #### Étape 1: Nouveau Web Service
 1. Cliquer **"New +"** → **"Web Service"**
-2. Sélectionner `alex-dembele/ssl-certs-monitor`
+2. Sélectionner `opendefender/OpenCert`
 
 #### Étape 2: Paramètres du service
 
@@ -189,7 +189,7 @@ Cliquer **"Deploy Web Service"**
 
 #### Étape 1: Nouveau Background Worker
 1. Cliquer **"New +"** → **"Background Worker"**
-2. Sélectionner `alex-dembele/ssl-certs-monitor`
+2. Sélectionner `opendefender/OpenCert`
 
 #### Étape 2: Paramètres du service
 
@@ -209,7 +209,7 @@ pip install -r requirements.txt
 
 #### Étape 4: Start Command
 ```bash
-python cron_job.py
+python scheduler.py
 ```
 
 #### Étape 5: Variables d'environnement
@@ -217,6 +217,8 @@ Ajouter les mêmes que le backend API:
 
 ```
 PYTHONUNBUFFERED=1
+DATABASE_URL=postgresql+psycopg://…   # la même base que l'API
+CHECK_INTERVAL_MINUTES=60
 SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
 SMTP_SENDER_EMAIL=votre-email@gmail.com
@@ -420,13 +422,13 @@ Une fois déployé, vous aurez:
    - Généralement les erreurs Python/Node.js sont claires
 
 4. **Ouvrir une issue GitHub:**
-   - [https://github.com/alex-dembele/ssl-certs-monitor/issues](https://github.com/alex-dembele/ssl-certs-monitor/issues)
+   - [https://github.com/opendefender/OpenCert/issues](https://github.com/opendefender/OpenCert/issues)
 
 ---
 
 ## Félicitations! 🎉
 
-Votre SSL Cert Monitor est maintenant déployé en ligne et accessible à tous!
+Votre OpenCert est maintenant déployé en ligne et accessible à tous!
 
 **Prochaines étapes:**
 - Partager l'URL du frontend avec d'autres

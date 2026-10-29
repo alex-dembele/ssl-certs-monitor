@@ -1,16 +1,15 @@
 # Fichier: frontend/Dockerfile
 
 # Étape 1: Build de l'application
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-ARG BACKEND_API_URL=http://localhost:8000
 RUN npm run build
 
 # Étape 2: Servir l'application optimisée
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/public ./public

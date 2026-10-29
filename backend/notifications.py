@@ -42,12 +42,13 @@ def idempotency_key(event: AlertEvent) -> str:
         "status": certificate.get("status"),
         "expiry": certificate.get("expiry_date"),
         "fingerprint": certificate.get("fingerprint"),
+        "occurred_at": event.occurred_at,
     }
     return hashlib.sha256(json.dumps(stable, sort_keys=True).encode()).hexdigest()
 
 
 def _render(events: list[AlertEvent]) -> str:
-    lines = ["SSL-Cert-Monitor notification", ""]
+    lines = ["OpenCert notification", ""]
     for event in events:
         lines.extend([
             f"Domain: {event.domain}",
@@ -74,7 +75,7 @@ class EmailChannel:
         if not all([sender, password, recipients, server_name]):
             raise RuntimeError("Configuration SMTP incomplète.")
         message = EmailMessage()
-        message["Subject"] = f"SSL-Cert-Monitor : {len(events)} notification(s)"
+        message["Subject"] = f"OpenCert : {len(events)} notification(s)"
         message["From"] = sender
         message["To"] = ", ".join(recipients)
         message["X-Idempotency-Key"] = idempotency_key

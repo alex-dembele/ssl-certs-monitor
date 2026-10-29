@@ -1,4 +1,4 @@
-# Guide des variantes de déploiement - SSL Cert Monitor
+# Guide des variantes de déploiement - OpenCert
 
 Le parcours de référence est [Docker Compose](README.md#déploiement-de-référence). Les offres gratuites et leurs quotas peuvent changer ; elles ne sont pas garanties par ce projet.
 
@@ -15,7 +15,7 @@ Le parcours de référence est [Docker Compose](README.md#déploiement-de-réfé
 
 **Comment déployer:**
 1. Créer un compte sur [render.com](https://render.com)
-2. Connecter votre repository GitHub (alex-dembele/ssl-certs-monitor)
+2. Connecter votre repository GitHub (opendefender/OpenCert)
 3. Créer un nouveau service Web (Blueprint ou manuel)
 4. Configurer:
    - Build Command: `npm install && npm run build` (pour le frontend)
@@ -121,7 +121,7 @@ git push origin main
    - **Environment:** Docker
    - **Root Directory:** backend
    - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `python cron_job.py`
+   - **Start Command:** `python scheduler.py`
    - **Environment Variables:** (copier du fichier .env)
 
 ---

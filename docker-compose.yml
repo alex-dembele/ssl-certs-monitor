@@ -2,10 +2,7 @@
 
 services:
   frontend:
-    build:
-      context: ./frontend
-      args:
-        BACKEND_API_URL: http://backend-api:8000
+    build: ./frontend
     ports:
       - "3000:3000"
     environment:
@@ -21,15 +18,12 @@ services:
     build: ./backend
     ports:
       - "8000:8000"
-    volumes:
-      - api_data:/app # Conserve le fichier JSON legacy pour la migration initiale
     environment:
       - PYTHONUNBUFFERED=1
       - BACKEND_API_TOKEN=${BACKEND_API_TOKEN:-}
       - APP_ENV=${APP_ENV:-development}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
       - DATABASE_URL=postgresql+psycopg://monitor:${POSTGRES_PASSWORD:-monitor}@db:5432/ssl_monitor
-      - LEGACY_DOMAINS_FILE=/app/domains.json
     dns: [ "8.8.8.8", "1.1.1.1" ]
     restart: unless-stopped
     depends_on:
@@ -57,8 +51,6 @@ services:
 
   backend-cron:
     build: ./backend
-    volumes:
-      - api_data:/app # Conserve le fichier JSON legacy pour la migration initiale
     dns: [ "8.8.8.8", "1.1.1.1" ]
     restart: unless-stopped
     depends_on:
@@ -69,10 +61,22 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - DATABASE_URL=postgresql+psycopg://monitor:${POSTGRES_PASSWORD:-monitor}@db:5432/ssl_monitor
-      - LEGACY_DOMAINS_FILE=/app/domains.json
-    command: >
-      sh -c "while true; do python cron_job.py; sleep 86400; done"
+      # Utilisé tant que l'intervalle n'est pas défini dans Paramètres > Organisation.
+      - CHECK_INTERVAL_MINUTES=${CHECK_INTERVAL_MINUTES:-60}
+      - SMTP_SERVER=${SMTP_SERVER:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_SENDER_EMAIL=${SMTP_SENDER_EMAIL:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - ALERT_RECIPIENTS=${ALERT_RECIPIENTS:-}
+      - ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL:-}
+      - ALERT_WEBHOOK_SECRET=${ALERT_WEBHOOK_SECRET:-}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - SLACK_WEBHOOK_SECRET=${SLACK_WEBHOOK_SECRET:-}
+      - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL:-}
+      - TEAMS_WEBHOOK_SECRET=${TEAMS_WEBHOOK_SECRET:-}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+      - DISCORD_WEBHOOK_SECRET=${DISCORD_WEBHOOK_SECRET:-}
+    command: ["python", "scheduler.py"]
 
 volumes:
-  api_data:
   postgres_data:

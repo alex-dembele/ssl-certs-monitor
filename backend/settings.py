@@ -33,6 +33,9 @@ class SettingsAuditLog(Base):
     changed_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
+# Portée dont les paramètres pilotent les vérifications et alertes planifiées.
+GLOBAL_SCOPE = "organization"
+
 DEFAULTS = {"threshold_days": 30, "check_interval_minutes": 60, "channel": "email", "recipients": [], "enabled": True}
 
 

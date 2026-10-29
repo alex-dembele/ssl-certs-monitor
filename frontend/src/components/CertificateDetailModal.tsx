@@ -1,7 +1,7 @@
 // Fichier: frontend/src/components/CertificateDetailModal.tsx
 "use client";
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Certificate } from './DashboardDisplay'; // On importera le type depuis le dashboard
 
@@ -18,6 +18,18 @@ const DetailRow = ({ label, value }: { label: string, value?: string }) => (
 );
 
 export default function CertificateDetailModal({ cert, onClose }: DetailModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!cert) return;
+    dialogRef.current?.focus();
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [cert, onClose]);
+
   return (
     <AnimatePresence>
       {cert && (
@@ -34,10 +46,15 @@ export default function CertificateDetailModal({ cert, onClose }: DetailModalPro
             exit={{ scale: 0.95, y: 50 }}
             transition={{ type: 'spring', stiffness: 400, damping: 40 }}
             className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="certificate-dialog-title"
+            tabIndex={-1}
+            ref={dialogRef}
             onClick={(e) => e.stopPropagation()}
           >
             <header className="p-6 border-b border-slate-700 sticky top-0 bg-slate-900/80 backdrop-blur-lg">
-              <h2 className="text-2xl font-bold text-slate-100">{cert.domain}</h2>
+              <h2 id="certificate-dialog-title" className="text-2xl font-bold text-slate-100">{cert.domain}</h2>
               <p className="text-sm text-slate-400">Détails du certificat SSL/TLS</p>
             </header>
             <div className="p-6">

@@ -11,8 +11,10 @@ from sqlalchemy.orm import Session
 
 try:
     from .database import Base
+    from .settings import GLOBAL_SCOPE, NotificationSettings, get_settings
 except ImportError:
     from database import Base
+    from settings import GLOBAL_SCOPE, NotificationSettings, get_settings
 
 
 class AlertPolicy(Base):
@@ -85,6 +87,8 @@ class AlertEvent:
     rule_id: int | None = None
     rule_name: str = "default"
     explanation: str = "Politique par défaut"
+    # Moment où l'événement a été émis : distingue deux rappels du même certificat.
+    occurred_at: str | None = None
 
 
 VALID_SCOPES = {"organization", "team", "project", "environment", "domain"}
@@ -135,18 +139,28 @@ def rule_to_dict(rule: AlertRule) -> dict:
     }
 
 
-def get_policy(session: Session, domain: str) -> AlertPolicy:
-    return session.get(AlertPolicy, domain) or AlertPolicy(
-        domain_name=domain, threshold_days=30, reminder_interval_hours=168, enabled=True, channel="email"
+def get_policy(session: Session, domain: str, defaults: NotificationSettings | None = None) -> AlertPolicy:
+    """Politique propre au domaine, sinon celle dérivée des paramètres globaux."""
+    policy = session.get(AlertPolicy, domain)
+    if policy is not None:
+        return policy
+    defaults = defaults or get_settings(session, GLOBAL_SCOPE)
+    return AlertPolicy(
+        domain_name=domain, threshold_days=defaults.threshold_days, reminder_interval_hours=168,
+        enabled=defaults.enabled, channel=defaults.channel,
     )
 
 
 def select_alert_events(session: Session, results: Iterable[dict], now: datetime | None = None) -> list[AlertEvent]:
     now = now or datetime.utcnow()
+    occurred_at = now.isoformat(timespec="seconds")
+    settings = get_settings(session, GLOBAL_SCOPE)
+    if not settings.enabled:
+        return []
     events = []
     for certificate in results:
         domain = certificate["domain"]
-        policy = get_policy(session, domain)
+        policy = get_policy(session, domain, settings)
         rule = resolve_alert_rule(session, domain, certificate)
         threshold_days = rule.threshold_days if rule else policy.threshold_days
         reminder_interval_hours = rule.reminder_interval_hours if rule else policy.reminder_interval_hours
@@ -161,12 +175,12 @@ def select_alert_events(session: Session, results: Iterable[dict], now: datetime
         if not policy.enabled:
             continue
         if is_critical and current_state == "healthy":
-            events.append(AlertEvent(domain, "problem", channel, certificate, rule.id if rule else None, rule_name, explanation))
+            events.append(AlertEvent(domain, "problem", channel, certificate, rule.id if rule else None, rule_name, explanation, occurred_at))
         elif is_critical and current_state == "critical" and state and state.last_notified_at:
             if now >= state.last_notified_at + timedelta(hours=reminder_interval_hours):
-                events.append(AlertEvent(domain, "reminder", channel, certificate, rule.id if rule else None, rule_name, explanation))
+                events.append(AlertEvent(domain, "reminder", channel, certificate, rule.id if rule else None, rule_name, explanation, occurred_at))
         elif not is_critical and current_state == "critical":
-            events.append(AlertEvent(domain, "resolved", channel, certificate, rule.id if rule else None, rule_name, explanation))
+            events.append(AlertEvent(domain, "resolved", channel, certificate, rule.id if rule else None, rule_name, explanation, occurred_at))
     return events
 
 
